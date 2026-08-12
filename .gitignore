@@ -30,3 +30,7 @@ Thumbs.db
 .vscode/
 .open-next/
 .wrangler/
+
+# Next.js build output
+.next/
+next-env.d.ts
