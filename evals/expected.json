@@ -1,0 +1,93 @@
+{
+  "$comment": [
+    "Hand-labelled ground truth for the 13 messages in data/inbound.json.",
+    "These are my labels, applied using the rules in lib/taxonomy.ts. They are a",
+    "judgement, not an objective answer key — the two marked contested below are",
+    "genuinely arguable, and the eval reports them separately so a disagreement",
+    "there is not confused with a clear miss.",
+    "Written before the first model run, so the labels are not reverse-engineered",
+    "from what the model happened to produce."
+  ],
+  "labels": [
+    {
+      "id": "inb-001",
+      "category": "prospect",
+      "priority": "high",
+      "why": "Qualified inbound with a stated $8M mandate and an explicit ask to be routed to someone."
+    },
+    {
+      "id": "inb-002",
+      "category": "existing_client",
+      "priority": "high",
+      "why": "Self-identified client with a hard third-party deadline (Friday, mortgage lender)."
+    },
+    {
+      "id": "inb-003",
+      "category": "vendor",
+      "priority": "low",
+      "why": "Unsolicited software sales outreach. No client impact."
+    },
+    {
+      "id": "inb-004",
+      "category": "recruiter",
+      "priority": "low",
+      "why": "Agency recruiter pitching a role. Nothing for the firm to action."
+    },
+    {
+      "id": "inb-005",
+      "category": "existing_client",
+      "priority": "high",
+      "why": "Unhappy client disputing a fee and asking for a callback today. Churn risk."
+    },
+    {
+      "id": "inb-006",
+      "category": "prospect",
+      "priority": "low",
+      "contested": true,
+      "why": "Real prospect asking about minimums and fees, but explicitly says 'no rush at all'. Low urgency, not low value — this is the case that tests whether the priority rules separate those two axes. A medium label here is defensible."
+    },
+    {
+      "id": "inb-007",
+      "category": "partner_referral",
+      "priority": "medium",
+      "why": "Another RIA proposing a reciprocal referral arrangement. Real commercial value, no deadline."
+    },
+    {
+      "id": "inb-008",
+      "category": "noise",
+      "priority": "low",
+      "why": "Automated newsletter with an unsubscribe link and no sender name."
+    },
+    {
+      "id": "inb-009",
+      "category": "unclear",
+      "priority": "medium",
+      "contested": true,
+      "why": "A named human following up on a conversation nobody can identify, from org '(unknown)'. There is genuinely no signal about what they want, so 'unclear' is correct and 'prospect' would be the model inventing context. Priority is medium because a real person is waiting on a reply. Expect the model to want to guess 'prospect' here — this is the primary mis-triage candidate."
+    },
+    {
+      "id": "inb-010",
+      "category": "unclear",
+      "priority": "low",
+      "why": "Empty web-form submission: every field blank, body is a single period. Nothing to triage."
+    },
+    {
+      "id": "inb-011",
+      "category": "unclear",
+      "priority": "low",
+      "why": "Transport-corrupted: NUL bytes, undecoded MIME encoded-word as the sender name, truncated multipart body."
+    },
+    {
+      "id": "inb-012",
+      "category": "existing_client",
+      "priority": "medium",
+      "why": "Client scheduling a routine quarterly review over the next few weeks. No deadline pressure."
+    },
+    {
+      "id": "inb-013",
+      "category": "prospect",
+      "priority": "high",
+      "why": "Warm referral from a named existing client (Dana Whitfield, inb-002), asking for an intro call soon. Warm introductions convert and decay quickly."
+    }
+  ]
+}
