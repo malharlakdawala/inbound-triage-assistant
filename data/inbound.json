@@ -1,0 +1,119 @@
+[
+  {
+    "id": "inb-001",
+    "received_at": "2026-07-20T09:14:00-04:00",
+    "channel": "email",
+    "from_name": "Gregory Palmer",
+    "from_org": "(individual)",
+    "subject": "Wealth planning after a liquidity event",
+    "body": "I recently sold my business and have around $8M in proceeds to invest. Looking for help with tax-efficient planning and setting up a family office structure. Who should I speak with?"
+  },
+  {
+    "id": "inb-002",
+    "received_at": "2026-07-20T10:02:00-04:00",
+    "channel": "web-form",
+    "from_name": "Dana Whitfield",
+    "from_org": "(individual)",
+    "subject": "Need updated statement by Friday",
+    "body": "I'm an existing client and my mortgage lender needs an updated portfolio statement by this Friday. Can someone send it over? This is fairly time-sensitive."
+  },
+  {
+    "id": "inb-003",
+    "received_at": "2026-07-20T11:37:00-04:00",
+    "channel": "email",
+    "from_name": "Marcus Reed",
+    "from_org": "Lumen Analytics",
+    "subject": "Portfolio analytics platform \u2014 quick demo?",
+    "body": "Hi team, we sell portfolio analytics software used by 200+ RIAs. Would love 20 minutes to show you what we do. Are you free next week?"
+  },
+  {
+    "id": "inb-004",
+    "received_at": "2026-07-20T12:10:00-04:00",
+    "channel": "linkedin",
+    "from_name": "Priya N.",
+    "from_org": "TalentBridge Recruiting",
+    "subject": "Exciting opportunity",
+    "body": "Hello! I came across your profile and think you'd be a great fit for a senior role with one of my clients. Open to a chat this week?"
+  },
+  {
+    "id": "inb-005",
+    "received_at": "2026-07-20T13:22:00-04:00",
+    "channel": "voicemail-transcript",
+    "from_name": "Robert Ellison",
+    "from_org": "(individual)",
+    "subject": "",
+    "body": "Yeah, hi, this is Bob Ellison, I'm a client. I just saw a fee on my last statement I don't understand and frankly I'm not happy about it. Someone needs to call me back today."
+  },
+  {
+    "id": "inb-006",
+    "received_at": "2026-07-20T14:05:00-04:00",
+    "channel": "email",
+    "from_name": "Alicia Tran",
+    "from_org": "(individual)",
+    "subject": "Just exploring options",
+    "body": "No rush at all \u2014 I'm early in thinking about whether to work with an advisor and just gathering information. What's your minimum, and how do fees work?"
+  },
+  {
+    "id": "inb-007",
+    "received_at": "2026-07-20T15:18:00-04:00",
+    "channel": "web-form",
+    "from_name": "Jordan Massey",
+    "from_org": "Cedar Ridge Wealth",
+    "subject": "Possible referral partnership",
+    "body": "I run a small RIA and occasionally have clients whose needs fall outside our scope. Could we explore a referral arrangement?"
+  },
+  {
+    "id": "inb-008",
+    "received_at": "2026-07-20T15:41:00-04:00",
+    "channel": "email",
+    "from_name": "",
+    "from_org": "Market Daily",
+    "subject": "Your Monday market digest",
+    "body": "MARKETS: Equities edged higher... [automated newsletter] To unsubscribe click here."
+  },
+  {
+    "id": "inb-009",
+    "received_at": "2026-07-20T16:03:00-04:00",
+    "channel": "email",
+    "from_name": "Sam Cho",
+    "from_org": "(unknown)",
+    "subject": "Following up",
+    "body": "Hi \u2014 just following up on our conversation. Let me know the next step whenever you get a chance. Thanks!"
+  },
+  {
+    "id": "inb-010",
+    "received_at": "2026-07-20T16:29:00-04:00",
+    "channel": "web-form",
+    "from_name": "",
+    "from_org": "",
+    "subject": "",
+    "body": "."
+  },
+  {
+    "id": "inb-011",
+    "received_at": "2026-07-20T16:44:00-04:00",
+    "channel": "email",
+    "from_name": "=?utf-8?B?",
+    "from_org": "(unknown)",
+    "subject": "RE: RE: FWD:",
+    "body": "\u0000\u0000 \ufffd\ufffd\ufffd --- forwarded message truncated --- Content-Type: multipart/alternative; boundary=00000"
+  },
+  {
+    "id": "inb-012",
+    "received_at": "2026-07-20T17:06:00-04:00",
+    "channel": "email",
+    "from_name": "Helen Ortiz",
+    "from_org": "(individual)",
+    "subject": "Quarterly review scheduling",
+    "body": "Hi, existing client here \u2014 I'd like to get our quarterly review on the calendar sometime in the next few weeks. Mornings work best for me."
+  },
+  {
+    "id": "inb-013",
+    "received_at": "2026-07-20T17:52:00-04:00",
+    "channel": "email",
+    "from_name": "Nathan Brooks",
+    "from_org": "(individual)",
+    "subject": "Referred by Dana Whitfield",
+    "body": "Dana Whitfield, a client of yours, suggested I reach out. I'm looking for comprehensive planning for my family and would like to set up an intro call soon."
+  }
+]
