@@ -1,5 +1,6 @@
 import { fetchQueue, type QueueRow } from '@/lib/supabase';
 import QueueView from './QueueView';
+import TryForm from './TryForm';
 
 // Always read fresh — the triage script writes out of band, so a cached page
 // would show stale results after a re-run.
@@ -39,6 +40,8 @@ export default async function Page() {
           run.
         </div>
       ) : null}
+
+      <TryForm />
 
       <QueueView rows={rows} />
 

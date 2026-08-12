@@ -358,7 +358,23 @@ evidence base is not, and no amount of engineering substitutes for it.
 
 ### Also worth naming
 
-- **The deployed app cannot spend money or write.** It holds only the publishable
+- **The public try-it form is the one place the deployment spends money, and the
+  guards there took three attempts to get right.** Version one wrapped each check
+  in `if (binding)`, so a missing binding silently disabled the limit — fail-open
+  on a spend guard. Version two added a KV limiter but I concluded from a bad test
+  that it did not work; in fact my seven sequential probes straddled a minute
+  boundary, because each call takes ~5s. Only after instrumenting the runtime to
+  print which bindings were actually visible did I confirm both were bound and the
+  limiter was functioning. It now fails closed (503 rather than an uncapped call),
+  caps at 150/day and 5/minute/IP, and never writes to the database.
+
+  Two lessons I would repeat. First, a guard you have not seen reject something is
+  not a guard — I asserted "rate limited" twice before observing a 429. Second, KV
+  is eventually consistent, so read-then-write undercounts under concurrency
+  (measured: 8 rapid calls registered as 5). That makes this a demo ceiling, not a
+  billing control, and I would use a Durable Object for anything real.
+
+- **The deployed app holds no write credential.** It holds only the publishable
   Supabase key and no LLM credential, so a public URL over a paid API is not an
   open proxy. Live re-triage requires an admin token that is not set in
   production.

@@ -7,7 +7,8 @@ shown in a queue ordered by what needs attention first.
 Built for the Arootah AI Product Engineer take-home. All data is synthetic.
 
 **Live:** https://inbound-triage-assistant.malharlakdawala.workers.dev
-(read-only by design — see Deploying)
+Shows the stored triage of all 13 messages, plus a **Try it live** form that runs
+a real `claude-opus-5` call on a message you paste. Capped — see Deploying.
 
 **The reasoning behind every choice is in [RATIONALE.md](./RATIONALE.md)** — that
 is the document worth reading; this one is how to run it.
@@ -106,10 +107,27 @@ the eval harness worth having.
 publishable key and is read-only under RLS. The service-role key bypasses RLS and
 never leaves a local machine.
 
-**The deployed app cannot call the LLM.** It reads stored results. Live re-triage
-requires an admin token that is not set in production, so a public URL over a paid
-API key is not an open proxy. Triage runs locally and the site serves what it
-produced.
+**One endpoint on the deployment can spend money, and it is capped three ways.**
+The queue itself is read-only — it serves results produced locally, and
+`/api/triage` (which writes) stays gated behind an admin token that production
+does not have. The exception is `/api/try`, the public form, because letting a
+reviewer actually use the tool is worth more than describing it. An
+unauthenticated endpoint calling a paid model is an API-key proxy, so:
+
+- **Per-IP limit** — 5/minute, enforced in KV (verified: the 6th request in a
+  minute returns 429).
+- **Global daily cap** — 150 live triages, ~$1.85/day worst case, resetting at
+  00:00 UTC.
+- **Input cap** — 2,000 characters, because cost scales with input tokens.
+- **No writes** — ad-hoc triage is returned and discarded, so the stored queue
+  cannot be polluted and no write credential exists on the Worker.
+
+It **fails closed**: if the KV limiter is unreachable the endpoint returns 503
+rather than calling the model uncapped. The honest limitation is that KV is
+eventually consistent, so read-then-write can undercount under a concurrent
+burst — measured at 8 rapid calls registering as 5. It is a demo spend ceiling,
+not a billing control; a Durable Object is the correct fix if it ever metered
+anything that mattered.
 
 **What I deliberately did not build:** auth, Docker, CI, a test-coverage target,
 telemetry, multi-user, streaming, a job queue. The brief puts these out of scope

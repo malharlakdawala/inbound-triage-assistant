@@ -1,17 +1,40 @@
 {
+  // Secrets are NOT declared here. OPENROUTER_API_KEY is set with
+  // `wrangler secret put`, which makes it a runtime binding rather than part of
+  // the build artifact - so `npm run check:bundle` still passes.
+  //
+  // TRIAGE_QUOTA (KV)      -> global daily counter for the public try-it form.
+  // TRIAGE_RATE_LIMIT      -> per-IP burst limit, 5 requests per 60s.
+
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "inbound-triage-assistant",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-03-01",
-  // nodejs_compat is required: the Anthropic and Supabase SDKs both reach for
-  // node built-ins, and lib/normalize.ts uses node:crypto for the cache hash.
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "observability": { "enabled": true }
-  // Secrets are NOT declared here. Set them with `wrangler secret put` or in the
-  // Cloudflare dashboard. Only the two read-path Supabase values belong in this
-  // deployment - see README "Deploying".
+  "observability": {
+    "enabled": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "TRIAGE_QUOTA",
+      "id": "a796b6637d1246da96bc87124fa8a576"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "TRIAGE_RATE_LIMIT",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ]
 }

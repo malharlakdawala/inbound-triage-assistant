@@ -250,3 +250,204 @@ footer {
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* ---- Try-it form ------------------------------------------------------- */
+
+.try-collapsed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.try-open {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.try-open:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.try-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.try {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 1rem 1.125rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.try-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.try-head h2 {
+  font-size: 1rem;
+  margin: 0 0 0.25rem;
+}
+
+.try-close {
+  font: inherit;
+  font-size: 0.75rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.try-sub {
+  margin: 0 0 0.875rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.try-sub code {
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.try-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.try-examples button {
+  font: inherit;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.try-examples button:hover {
+  border-color: var(--accent);
+}
+
+.try form {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.try-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem;
+}
+
+@media (max-width: 34rem) {
+  .try-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.try label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  position: relative;
+}
+
+.try input,
+.try textarea {
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.4rem 0.55rem;
+  width: 100%;
+  resize: vertical;
+}
+
+.try input:focus,
+.try textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.try-count {
+  justify-self: end;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.try-submit {
+  font: inherit;
+  font-weight: 600;
+  justify-self: start;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--text);
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+}
+
+.try-submit:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.try-err {
+  margin-top: 0.875rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--high);
+  background: var(--high-bg);
+  color: var(--high);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+}
+
+.try-result {
+  margin-top: 1rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border);
+}
+
+.try-result .badges {
+  margin-bottom: 0.5rem;
+}
+
+.try-detail {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.try-detail code {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.try-quota {
+  font-variant-numeric: tabular-nums;
+}
