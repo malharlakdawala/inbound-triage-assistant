@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { normalize, type InboundMessage } from '@/lib/normalize';
-import { triageMessage } from '@/lib/anthropic';
+import { triageMessage } from '@/lib/llm';
 import { writeClient } from '@/lib/supabase';
 import type { SimulatedFailure } from '@/lib/schema';
 

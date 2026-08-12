@@ -9,6 +9,10 @@ Built for the Arootah AI Product Engineer take-home. All data is synthetic.
 **The reasoning behind every choice is in [RATIONALE.md](./RATIONALE.md)** — that
 is the document worth reading; this one is how to run it.
 
+Measured on the full set: **category 13/13, priority 9/13, $0.16, p95 7.5s.**
+The priority gap is the interesting part — and one of those four disagreements
+turned out to be my label being wrong, not the model's.
+
 ## Quick start
 
 ```bash
@@ -16,14 +20,29 @@ git clone https://github.com/malharlakdawala/inbound-triage-assistant.git
 cd inbound-triage-assistant
 npm install
 
-cp .env.example .env.local     # then fill in ANTHROPIC_API_KEY and the Supabase values
+cp .env.example .env.local     # fill in an LLM key + the Supabase values
 
 npm run db:migrate             # or paste supabase/migrations/0001_arootah_triage.sql into the SQL editor
 npm run db:seed                # taxonomy + contacts + the 13 messages
-npm run triage                 # calls the LLM, writes results (~13 calls, a few cents)
+npm run triage                 # calls the LLM, writes results (13 calls, ~$0.16)
 npm run eval                   # scores the run against evals/expected.json
 npm run dev                    # http://localhost:3000
 ```
+
+### Which LLM
+
+`claude-opus-5`, reachable two ways. Set **either** key and the provider
+auto-detects; set both and pin `LLM_PROVIDER` to choose.
+
+| Provider | Env | Wire protocol |
+|---|---|---|
+| Anthropic direct | `ANTHROPIC_API_KEY` | `output_config.format` + `messages.parse()` |
+| OpenRouter | `OPENROUTER_API_KEY` | OpenAI-compatible `response_format: json_schema` |
+
+The measured run used OpenRouter (`anthropic/claude-opus-5`) because the direct
+Anthropic account hit its spend limit mid-build. The guardrails sit above the
+transport, so switching route was one env var and changed none of the validation
+behaviour — see [RATIONALE.md](./RATIONALE.md) §b.
 
 `npm run triage` is cached on `sha256(message + prompt_version + model)`, so
 re-running costs nothing unless something actually changed. `--force` re-triages,
@@ -146,13 +165,20 @@ accepted:
   Both are judgement calls about an advisory firm's workflow, and I made them
   before any code existed.
 - **Where I overrode the model.** The first prompt (`prompts/v1.md`) contained
-  *"If in doubt, pick the most likely category"* — a reasonable-sounding
-  instruction that is actively wrong here. It made `inb-009` come back as
-  `prospect` with high confidence when the honest answer is `unclear`; a confident
-  wrong label looks handled and quietly ages out, which is worse than routing to a
-  human. I rewrote the prompt to make `unclear` an explicit instruction with a
-  confidence ceiling, and separated urgency from value after it promoted a
-  self-declared "no rush" prospect. Both versions are in `prompts/`.
+  *"If in doubt, pick the most likely category"*. That made `inb-009` — a sender
+  nobody can identify — come back as `prospect` with high confidence. A confident
+  wrong label looks handled, so it routes to business development and ages out
+  silently; that is worse than routing to a human. I rewrote the prompt to make
+  `unclear` an explicit instruction with a confidence ceiling. It worked: on the
+  measured run `inb-009` is `unclear` at 0.32 confidence.
+- **Where the eval overrode *me*.** I predicted `inb-009` would still be the
+  mis-triage. It wasn't — category accuracy came out 13/13. What the harness found
+  instead was that all four priority disagreements ran one way (the model
+  under-escalating), and on `inb-002` **the model was right and my label was
+  wrong**: "by this Friday" is four days out, and my own `high` rule says "inside
+  ~48 hours". The model applied the rule I wrote; my label encoded what I meant.
+  I left the measurement honest rather than tuning the prompt until it agreed with
+  me, which is how you overfit a 13-row eval. Full write-up in RATIONALE §c.
 - **Turning down the emphasis.** The first draft was full of
   `CRITICAL:` / `You MUST`. That register is a habit from older models; the current
   one follows instructions literally, so marking everything critical stops it
@@ -169,6 +195,8 @@ covers `.env*`.
 | Variable | Where | Notes |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | local only | Server-side. Never reaches the browser. |
+| `OPENROUTER_API_KEY` | local only | Alternative route to the same model. |
+| `LLM_PROVIDER` | local only | `anthropic` \| `openrouter`. Auto-detects when unset. |
 | `NEXT_PUBLIC_SUPABASE_URL` | local + deployed | |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | local + deployed | Read-only under RLS. |
 | `SUPABASE_URL` | local only | |
@@ -192,6 +220,6 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
-Leave `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `TRIAGE_ADMIN_TOKEN`
-unset. The deployment is then structurally incapable of spending money or writing
+Leave `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and
+`TRIAGE_ADMIN_TOKEN` unset. The deployment is then structurally incapable of spending money or writing
 to the database.

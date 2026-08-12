@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeClient } from '../lib/supabase';
 import { normalize, inputHash, type InboundMessage } from '../lib/normalize';
-import { triageMessage, MODEL, type TriageOutcome } from '../lib/anthropic';
+import { triageMessage, activeModel, activeProvider, modelLabel, type TriageOutcome } from '../lib/llm';
 import { PROMPT_VERSION } from '../lib/prompt';
 import type { SimulatedFailure } from '../lib/schema';
 
@@ -79,6 +79,7 @@ async function main() {
   }
 
   // --- cache check ---------------------------------------------------------
+  const MODEL = modelLabel();
   const hashes = messages.map((m) => inputHash(m, PROMPT_VERSION, MODEL));
   let cached = new Set<string>();
   if (!args.force && !args.dryRun) {
@@ -91,7 +92,7 @@ async function main() {
   const skipped = messages.length - todo.length;
 
   console.log(
-    `model=${MODEL} prompt=${PROMPT_VERSION} effort=${args.effort}` +
+    `provider=${activeProvider()} model=${activeModel()} prompt=${PROMPT_VERSION} effort=${args.effort}` +
       (args.simulate !== 'none' ? ` simulate=${args.simulate}` : '') +
       (args.dryRun ? ' (dry run)' : ''),
   );

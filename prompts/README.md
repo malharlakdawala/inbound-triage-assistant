@@ -27,12 +27,39 @@ Three parts, in this order:
 
 | Parameter | Value | Why |
 |---|---|---|
-| `model` | `claude-opus-5` | Current Opus. Structured outputs supported. |
+| `model` | `claude-opus-5` | Current Opus. Structured outputs supported on both routes (`anthropic/claude-opus-5` via OpenRouter). |
 | `output_config.format` | Zod schema via `zodOutputFormat` | Constrains generation to the schema — see enforcement below. |
-| `output_config.effort` | `medium` | The cost dial. `low` was measurably worse on the two ambiguous messages; `high` cost more without changing a label. |
+| `output_config.effort` | `medium` | The cost dial. Measured at all three levels — see below. |
 | thinking | on (default) | Left on deliberately. The interesting cases here turn on a judgement call, and reasoning changes the label. Disabling thinking on this model has its own failure modes, so `effort` is the right dial for cost. |
 | `max_tokens` | 2048 | Well clear of the ~250 tokens a result needs. Truncation would be a schema violation, so headroom is cheaper than the retry. |
 | `maxRetries` | 3 (SDK) | Transport-level only: 429/5xx/timeouts, with backoff. Not used for schema failures, which need a different fix. |
+
+## Effort: what it actually changed
+
+Full set of 13, one run each, all three levels (`npm run triage -- --force --effort <level> --dry-run`):
+
+| effort | category | priority vs my labels | cost | p50 | p95 |
+|---|---|---|---|---|---|
+| `low` | 13/13 | **10/13** | $0.1569 | 4.6s | 6.4s |
+| `medium` | 13/13 | 9/13 | $0.1596 | 4.5s | 7.5s |
+| `high` | 13/13 | 9/13 | $0.1715 | 4.9s | 8.6s |
+
+**Effort changed nothing about categorisation** — 13/13 at every level. The only
+label that moved anywhere was `inb-002`'s priority: `high` at `low` effort,
+`medium` at `medium` and `high`. Cost varied about 9% end to end.
+
+I am *not* claiming a trend from that. One label flip on 13 messages is well
+inside run-to-run variance for a non-deterministic model, and the honest reading
+is that on this corpus effort is close to a pure cost knob. `medium` is kept as
+the default because it sits in the middle on spend and because the corpus is too
+small to justify tuning against; a real deployment should re-measure on a few
+hundred messages before treating any level as better.
+
+Worth noting which direction the one difference ran, though: at `low` the model
+returned `high` for `inb-002`, matching what I *meant*; at `medium`/`high` it
+returned `medium`, matching the 48-hour rule I actually *wrote*. See
+[RATIONALE.md](../RATIONALE.md) §c — the disagreement is about my specification,
+not the model's reading of it.
 
 ## How the JSON output is enforced
 
@@ -46,8 +73,12 @@ Four layers, because each catches something the one before it cannot:
    before anything is parsed — trusting the constraint alone is exactly the bug
    this layer exists to prevent.
 3. **Re-validation with Zod.** The parsed output is validated again in-process.
-   This is what catches an invented category or an out-of-range confidence, and
-   it is the layer the `--simulate malformed` flag exercises.
+   Not redundant with layer 1, and measurably so: constrained decoding **rejects
+   numeric range constraints outright** (`For 'number' type, properties maximum,
+   minimum are not supported`), so `stripUnsupported()` removes them before
+   sending and `confidence ∈ 0..1` is enforced *only* here. Without this layer a
+   confidence of 42 reaches the database — which is exactly what
+   `--simulate malformed` demonstrates.
 4. **One repair attempt, then a deterministic fallback.** On a validation
    failure the specific error is fed back and the call is retried exactly once.
    If that also fails, the row is written as `unclear` / `low` with
