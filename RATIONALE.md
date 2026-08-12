@@ -362,6 +362,28 @@ evidence base is not, and no amount of engineering substitutes for it.
   Supabase key and no LLM credential, so a public URL over a paid API is not an
   open proxy. Live re-triage requires an admin token that is not set in
   production.
+- **The build system leaked every secret into the deployable artifact, and I only
+  found it because I checked.** `@opennextjs/cloudflare` serialises everything
+  Next.js loads into `.open-next/cloudflare/next-env.mjs` and ships it inside the
+  Worker. Next.js auto-loads `.env.local`, so the Anthropic key, the OpenRouter
+  key, the Supabase service-role key and the admin token were all embedded in the
+  bundle — with no warning, and with the `NEXT_PUBLIC_` prefix being irrelevant.
+  Deploying it would have published four live credentials at a public URL while
+  the README claimed the opposite.
+
+  The fix is structural: `.env.local` now holds only values that are safe to
+  publish, secrets live in `.env.secrets` (a filename Next.js does not know, so it
+  is never bundled), and `npm run check:bundle` fails `cf:build` if any secret
+  value, known credential pattern, or `service_role` JWT claim appears in the
+  artifact. Verified both directions — the guard flags the old bundle and passes
+  the new one, and in `workerd` with no secrets present `POST /api/triage` returns
+  501 rather than running.
+
+  The generalisable lesson, and the reason this belongs in a risk section: **a
+  security property that nothing tests is a hope, not a property.** I had written
+  the read-only claim in the README before it was true. The gap between the two
+  was one `grep` wide.
+
 - **The service-role key never leaves a developer machine.** It bypasses RLS, so
   shipping it would make any route-handler bug a full-database write primitive.
 - **PII.** The synthetic data is harmless, but real inbound mail contains client

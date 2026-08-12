@@ -189,31 +189,34 @@ accepted:
 
 ## Environment
 
-See [`.env.example`](./.env.example). Secrets are never committed — `.gitignore`
-covers `.env*`.
+Two files, and the split is a **deployment-safety boundary rather than a
+convention**:
 
-| Variable | Where | Notes |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | local only | Server-side. Never reaches the browser. |
-| `OPENROUTER_API_KEY` | local only | Alternative route to the same model. |
-| `LLM_PROVIDER` | local only | `anthropic` \| `openrouter`. Auto-detects when unset. |
-| `NEXT_PUBLIC_SUPABASE_URL` | local + deployed | |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | local + deployed | Read-only under RLS. |
-| `SUPABASE_URL` | local only | |
-| `SUPABASE_SERVICE_ROLE_KEY` | **local only** | Bypasses RLS. Do not deploy. |
-| `DATABASE_URL` | local only | Migrations only; optional. |
-| `TRIAGE_ADMIN_TOKEN` | **local only** | Leave unset in production. |
+| File | Loaded by | Ends up in the Worker? | Contents |
+|---|---|---|---|
+| `.env.local` | Next.js (auto) | **Yes** | Read-path Supabase values only |
+| `.env.secrets` | `lib/load-env.ts` only | No | LLM keys, service-role key, admin token |
+
+`@opennextjs/cloudflare` serialises everything Next.js loads into
+`.open-next/cloudflare/next-env.mjs` and bundles it into the deployed Worker —
+irrespective of the `NEXT_PUBLIC_` prefix. Putting a secret in `.env.local`
+therefore publishes it. This is not hypothetical: it happened during this build
+and baked four live credentials into the artifact.
+
+`npm run check:bundle` scans the built Worker for the values in `.env.secrets`,
+for known credential patterns, and for a `service_role` claim inside any decoded
+JWT. It is wired into `cf:build`, so an unsafe artifact cannot be produced
+silently. See [`.env.example`](./.env.example) for the full list.
 
 ## Deploying
 
-Cloudflare Workers via OpenNext:
-
 ```bash
-npm run cf:build
+npx wrangler login       # once
+npm run cf:build         # builds, then refuses to pass if a secret leaked
 npm run cf:deploy
 ```
 
-Set **only** these two as secrets on Cloudflare:
+Set **only** these two as Cloudflare secrets:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
@@ -221,5 +224,12 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
 Leave `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and
-`TRIAGE_ADMIN_TOKEN` unset. The deployment is then structurally incapable of spending money or writing
-to the database.
+`TRIAGE_ADMIN_TOKEN` unset. Verified in the `workerd` runtime with no secrets
+present: the page renders all 13 rows, and `POST /api/triage` returns
+
+```
+501  {"error":"Live triage is disabled in this environment."}
+```
+
+so the deployment is structurally incapable of calling a paid API or writing to
+the database.

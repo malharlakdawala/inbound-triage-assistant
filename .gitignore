@@ -34,3 +34,6 @@ Thumbs.db
 # Next.js build output
 .next/
 next-env.d.ts
+
+# Local Workers preview vars
+.dev.vars

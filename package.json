@@ -11,9 +11,10 @@
     "db:seed": "tsx scripts/seed.ts",
     "triage": "tsx scripts/triage.ts",
     "eval": "tsx scripts/eval.ts",
-    "cf:build": "opennextjs-cloudflare build",
+    "cf:build": "opennextjs-cloudflare build && npm run check:bundle",
     "cf:preview": "opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "check:bundle": "tsx scripts/check-bundle.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
