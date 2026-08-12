@@ -1,0 +1,135 @@
+{
+  "name": "Inbound triage - high-priority client escalation",
+  "meta": {
+    "description": "Fires when triage marks an existing-client message high priority. Posts to the client-service Slack channel and opens a task for the owning advisor with a 4-hour due date. Deliberately narrow: this is the one intersection where a false positive costs an extra Slack message and a false negative costs a client."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyMinute" }] },
+        "tableId": "results",
+        "schema": "triage",
+        "event": "rowAdded"
+      },
+      "id": "trigger-supabase",
+      "name": "New triage result",
+      "type": "n8n-nodes-base.supabaseTrigger",
+      "typeVersion": 1,
+      "position": [-460, 0],
+      "credentials": { "supabaseApi": { "id": "REPLACE_ME", "name": "Supabase (triage)" } },
+      "notes": "Polling rather than a webhook so a missed minute self-heals on the next tick instead of silently dropping an escalation."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "version": 2 },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "high",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "existing_client",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json.source }}",
+              "rightValue": "fallback",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "filter-escalate",
+      "name": "High priority + existing client?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "notes": "The third condition matters: a fallback row means triage failed, so its 'priority' is a placeholder, not a judgement. Escalating on it would page someone because the API had a bad minute."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "messages",
+        "schema": "triage",
+        "filters": {
+          "conditions": [
+            { "keyName": "id", "condition": "eq", "keyValue": "={{ $json.message_id }}" }
+          ]
+        }
+      },
+      "id": "fetch-message",
+      "name": "Fetch original message",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-20, -100],
+      "credentials": { "supabaseApi": { "id": "REPLACE_ME", "name": "Supabase (triage)" } },
+      "notes": "The results row carries the verdict, not the sender. Fetch the message so the Slack post names a person."
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": { "__rl": true, "value": "#client-service", "mode": "name" },
+        "text": "=:rotating_light: *High-priority client message*\n\n*From:* {{ $json.from_name || 'unknown sender' }}{{ $json.from_org ? ' (' + $json.from_org + ')' : '' }}\n*Channel:* {{ $json.channel }}\n*Received:* {{ $json.received_at }}\n\n*Summary:* {{ $('High priority + existing client?').item.json.summary }}\n\n*Next action:* {{ $('High priority + existing client?').item.json.next_action }}\n\n_Confidence {{ $('High priority + existing client?').item.json.confidence }} · {{ $json.id }}_",
+        "otherOptions": { "includeLinkToWorkflow": false }
+      },
+      "id": "slack-notify",
+      "name": "Post to client service",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [200, -100],
+      "credentials": { "slackApi": { "id": "REPLACE_ME", "name": "Slack (Northwind)" } }
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "create",
+        "name": "=Respond to {{ $('Fetch original message').item.json.from_name || 'client' }} - {{ $('High priority + existing client?').item.json.summary }}",
+        "additionalFields": {
+          "dueOn": "={{ $now.plus(4, 'hours').toISO() }}",
+          "notes": "=Next action: {{ $('High priority + existing client?').item.json.next_action }}\n\nOriginal message:\n{{ $('Fetch original message').item.json.body }}\n\nTriage: {{ $('High priority + existing client?').item.json.category }} / {{ $('High priority + existing client?').item.json.priority }} (confidence {{ $('High priority + existing client?').item.json.confidence }}, {{ $('High priority + existing client?').item.json.model }} {{ $('High priority + existing client?').item.json.prompt_version }})"
+        }
+      },
+      "id": "create-task",
+      "name": "Create advisor task",
+      "type": "n8n-nodes-base.asana",
+      "typeVersion": 1,
+      "position": [420, -100],
+      "credentials": { "asanaApi": { "id": "REPLACE_ME", "name": "Asana (Northwind)" } },
+      "notes": "A 4-hour due date rather than 'today': the SLA the priority rule implies should be visible in the task system, not just in the prompt."
+    },
+    {
+      "parameters": {
+        "amount": 0
+      },
+      "id": "noop",
+      "name": "No escalation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-20, 120],
+      "notes": "Everything else is handled by the queue UI. Not every message deserves an interrupt."
+    }
+  ],
+  "connections": {
+    "New triage result": {
+      "main": [[{ "node": "High priority + existing client?", "type": "main", "index": 0 }]]
+    },
+    "High priority + existing client?": {
+      "main": [
+        [{ "node": "Fetch original message", "type": "main", "index": 0 }],
+        [{ "node": "No escalation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch original message": {
+      "main": [[{ "node": "Post to client service", "type": "main", "index": 0 }]]
+    },
+    "Post to client service": {
+      "main": [[{ "node": "Create advisor task", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

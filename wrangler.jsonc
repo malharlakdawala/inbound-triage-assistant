@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "inbound-triage-assistant",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-03-01",
+  // nodejs_compat is required: the Anthropic and Supabase SDKs both reach for
+  // node built-ins, and lib/normalize.ts uses node:crypto for the cache hash.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+  // Secrets are NOT declared here. Set them with `wrangler secret put` or in the
+  // Cloudflare dashboard. Only the two read-path Supabase values belong in this
+  // deployment - see README "Deploying".
+}
