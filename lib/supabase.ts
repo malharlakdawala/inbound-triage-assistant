@@ -12,7 +12,7 @@ import { createClient } from '@supabase/supabase-js';
  * full-database write primitive — so it simply is not shipped.
  */
 
-const SCHEMA = 'triage';
+const SCHEMA = 'arootah_triage';
 
 function required(name: string): string {
   const v = process.env[name];

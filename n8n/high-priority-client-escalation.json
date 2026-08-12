@@ -8,7 +8,7 @@
       "parameters": {
         "pollTimes": { "item": [{ "mode": "everyMinute" }] },
         "tableId": "results",
-        "schema": "triage",
+        "schema": "arootah_triage",
         "event": "rowAdded"
       },
       "id": "trigger-supabase",
@@ -54,7 +54,7 @@
       "parameters": {
         "operation": "get",
         "tableId": "messages",
-        "schema": "triage",
+        "schema": "arootah_triage",
         "filters": {
           "conditions": [
             { "keyName": "id", "condition": "eq", "keyValue": "={{ $json.message_id }}" }

@@ -18,7 +18,7 @@ npm install
 
 cp .env.example .env.local     # then fill in ANTHROPIC_API_KEY and the Supabase values
 
-npm run db:migrate             # or paste supabase/migrations/0001_triage.sql into the SQL editor
+npm run db:migrate             # or paste supabase/migrations/0001_arootah_triage.sql into the SQL editor
 npm run db:seed                # taxonomy + contacts + the 13 messages
 npm run triage                 # calls the LLM, writes results (~13 calls, a few cents)
 npm run eval                   # scores the run against evals/expected.json
@@ -57,10 +57,10 @@ lib/prompt.ts        prompt assembled from lib/taxonomy.ts
 lib/anthropic.ts     constrained generation -> stop-reason checks -> Zod revalidation
       |              -> one repair retry -> deterministic fallback
       v
-triage.results       one row per (message, prompt_version, model), with provenance
+arootah_triage.results       one row per (message, prompt_version, model), with provenance
       |
       v
-triage.queue view -> app/page.tsx
+arootah_triage.queue view -> app/page.tsx
 ```
 
 ## Design choices and tradeoffs
@@ -119,7 +119,7 @@ themselves.
 
 ## One n8n automation I would add
 
-**Trigger:** Supabase row inserted into `triage.results` where
+**Trigger:** Supabase row inserted into `arootah_triage.results` where
 `priority = 'high'` AND `category = 'existing_client'`.
 
 **Action:** post to the client-service Slack channel with the summary, the next
