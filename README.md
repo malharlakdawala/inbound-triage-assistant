@@ -6,6 +6,9 @@ shown in a queue ordered by what needs attention first.
 
 Built for the Arootah AI Product Engineer take-home. All data is synthetic.
 
+**Live:** https://inbound-triage-assistant.malharlakdawala.workers.dev
+(read-only by design — see Deploying)
+
 **The reasoning behind every choice is in [RATIONALE.md](./RATIONALE.md)** — that
 is the document worth reading; this one is how to run it.
 
@@ -216,20 +219,18 @@ npm run cf:build         # builds, then refuses to pass if a secret leaked
 npm run cf:deploy
 ```
 
-Set **only** these two as Cloudflare secrets:
+**No Cloudflare configuration is required.** The two read-path Supabase values
+are in `.env.local`, so the build embeds them — which is correct, because the
+publishable key is public by design and RLS restricts it to `SELECT`. Everything
+secret lives in `.env.secrets`, which the build never reads.
 
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-```
-
-Leave `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and
-`TRIAGE_ADMIN_TOKEN` unset. Verified in the `workerd` runtime with no secrets
-present: the page renders all 13 rows, and `POST /api/triage` returns
+Verified against the live deployment: `POST /api/triage` returns
 
 ```
 501  {"error":"Live triage is disabled in this environment."}
 ```
 
-so the deployment is structurally incapable of calling a paid API or writing to
-the database.
+for both a missing token and a guessed one, and grepping the served HTML and every
+JS chunk for `sk-ant-api`, `sk-or-v1`, `service_role` and `TRIAGE_ADMIN` returns
+zero hits. The deployment is structurally incapable of calling a paid API or
+writing to the database: it holds no credential that would let it.
