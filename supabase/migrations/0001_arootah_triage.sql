@@ -204,7 +204,24 @@ begin
   end if;
 end $$;
 
--- Expose the schema to the Supabase REST API and let anon read the view.
-grant usage on schema arootah_triage to anon, authenticated;
+-- Expose the schema to the Supabase REST API.
+--
+-- Two different grant levels, matching the two clients:
+--   anon / authenticated -> SELECT only, and still subject to the RLS policies
+--                           above. This is the key the deployed app carries.
+--   service_role         -> full DML for the local seed and triage scripts. It
+--                           bypasses RLS by design, which is exactly why it
+--                           never leaves a developer machine.
+--
+-- The schema also has to be listed in the project's PostgREST "exposed schemas"
+-- setting, otherwise every request fails with `Invalid schema` regardless of
+-- these grants. Adding a schema there does not affect `public`.
+grant usage on schema arootah_triage to anon, authenticated, service_role;
+
 grant select on all tables in schema arootah_triage to anon, authenticated;
 alter default privileges in schema arootah_triage grant select on tables to anon, authenticated;
+
+grant all on all tables in schema arootah_triage to service_role;
+grant all on all sequences in schema arootah_triage to service_role;
+alter default privileges in schema arootah_triage grant all on tables to service_role;
+alter default privileges in schema arootah_triage grant all on sequences to service_role;

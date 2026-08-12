@@ -10,7 +10,7 @@
  * paste the SQL straight into the Supabase SQL editor; the migration is written to
  * be idempotent, so running it twice is harmless either way.
  */
-import 'dotenv/config';
+import '../lib/load-env';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';

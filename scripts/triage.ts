@@ -13,7 +13,7 @@
  * costs nothing. That distinction is the whole point: it makes iterating on the
  * prompt cheap without ever serving a stale answer.
  */
-import 'dotenv/config';
+import '../lib/load-env';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeClient } from '../lib/supabase';

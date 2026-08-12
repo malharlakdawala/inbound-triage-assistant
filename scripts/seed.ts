@@ -4,7 +4,7 @@
  * Idempotent — safe to re-run. Uses the service-role key, so it is a local-only
  * script by design.
  */
-import 'dotenv/config';
+import '../lib/load-env';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeClient } from '../lib/supabase';

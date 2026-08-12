@@ -12,7 +12,7 @@
  * Reads from the database rather than re-calling the model, so scoring is free
  * and deterministic.
  */
-import 'dotenv/config';
+import '../lib/load-env';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeClient } from '../lib/supabase';
