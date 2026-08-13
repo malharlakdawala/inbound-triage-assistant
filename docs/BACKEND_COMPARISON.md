@@ -1,7 +1,8 @@
 # Two backends, same pipeline
 
-The same triage pipeline is implemented twice: once as Next.js route handlers, once
-as an n8n workflow. Both call `claude-opus-5`, both use the same taxonomy, and both
+The same triage pipeline is implemented three ways: as Next.js route handlers, as an
+n8n workflow calling a hosted model, and as an n8n workflow calling a **local**
+model with no external database at all. Both call `claude-opus-5`, both use the same taxonomy, and both
 run normalise → constrained call → schema validation → one repair retry →
 deterministic fallback → persist → respond.
 
@@ -22,6 +23,86 @@ is worth much more if you have actually built both.
 | Failure visibility | Read the logs | See exactly which node went red |
 | Cost per message | ~$0.0123 measured | Same model, same tokens — same cost |
 | Nodes / files to understand | ~6 files | 12 nodes |
+
+## The three variants
+
+| | Next.js (primary) | n8n + OpenRouter | n8n + Ollama |
+|---|---|---|---|
+| File | `lib/llm.ts` | `n8n/triage-backend-workflow.json` | `n8n/triage-backend-ollama.json` |
+| Model | `claude-opus-5` | `claude-opus-5` (same) | local, your choice |
+| Output enforcement | schema-constrained decoding | schema-constrained decoding | **`format: json` only** |
+| Storage | Supabase Postgres | Supabase Postgres | n8n Data table |
+| Cost per message | ~$0.0123 | ~$0.0123 | **$0** |
+| Client data leaves the network | yes | yes | **no** |
+| Measured accuracy | 13/13 category | same model, same prompt | **unmeasured** |
+| External dependencies | Supabase + LLM API | Supabase + LLM API | **none** |
+
+## The Ollama variant, and why it is not simply "the same but free"
+
+Two differences change the engineering, not just the bill.
+
+**There is no schema-constrained decoding.** The Ollama node exposes
+`options.format` with exactly two values, `''` and `'json'`. That guarantees the
+output parses as JSON; it guarantees nothing about the shape. The hosted variants
+constrain generation to the exact schema, so an invented category is close to
+impossible. Here it is entirely possible.
+
+The consequence is that `Validate Against Schema` stops being a second line of
+defence and becomes **the** contract enforcement, and the repair retry moves from
+a rarely-exercised safety net to a path expected to fire in normal operation. The
+validator in this variant is correspondingly more defensive than its OpenRouter
+twin: it checks several possible response shapes, strips markdown fences, falls
+back to extracting the outermost brace pair, and coerces a numeric-looking string
+confidence — all failure modes that constrained decoding made impossible upstream.
+
+If you want the layered-guardrails argument demonstrated rather than asserted,
+this is the variant to show. The layers here are load-bearing.
+
+**Accuracy is unmeasured and will be lower.** The 13/13 category figure was
+measured on `claude-opus-5`. A local model has not been scored on this corpus, and
+I would expect the nuanced cases to degrade first: `inb-006` (a real prospect who
+says "no rush" — low urgency, high value) and `inb-009` (a named human with no
+recoverable context, where the correct answer is to admit ignorance). Both require
+resisting an obvious-looking wrong answer, which is exactly where smaller models
+struggle.
+
+`npm run eval` scores whatever is in the database, so the honest way to find out is
+to drive the webhook over all 13 messages and score the responses — not to assume
+the number transfers.
+
+**What it buys, which is not small.** Zero marginal cost, and **no client message
+ever leaves the server**. For an advisory firm this is the serious argument: real
+inbound mail contains client financial details, and the hosted variants send those
+to a third-party API — via OpenRouter, to a second processor. A local model removes
+that entirely, and removes the data-protection conversation with it. If I were
+proposing this to a compliance-conscious firm, I would lead with the local variant
+and treat the accuracy gap as the thing to measure and close, not as a reason to
+dismiss it.
+
+## Running the Ollama variant
+
+Import [`n8n/triage-backend-ollama.json`](../n8n/triage-backend-ollama.json)
+(12 nodes, no credentials embedded), then three manual steps I could not do for you:
+
+1. **Pick the model** on both `Triage via Ollama` and `Repair Attempt`. The model
+   selector is left empty on purpose — I cannot enumerate what you have pulled.
+   Prefer an instruction-tuned model that follows JSON instructions well; a
+   reasoning-heavy model is wasted here and slower.
+2. **Attach your Ollama credential** to both nodes.
+3. **Create a Data table** named `arootah_triage_results`. Columns, matching the
+   `Store Triage Result` node: `message_id`, `summary`, `category`, `priority`,
+   `next_action`, `reasoning`, `source`, `prompt_version`, `backend`, `triaged_at`
+   (all string), `confidence` (number), `needs_review`, `low_signal` (boolean).
+   Do **not** add an `id` column — n8n generates row IDs.
+
+Then activate and call it exactly as the OpenRouter variant, above. Responses carry
+`backend: "n8n-ollama"` so it is unambiguous which implementation answered. Both
+Ollama nodes are set to `onError: continueRegularOutput`, so an unreachable Ollama
+host produces a fallback row rather than a dead execution.
+
+Temperature is 0.1 on the first pass and 0 on the repair — low, because triage
+wants consistency, and because the repair attempt should be as literal as possible
+about the correction it was just given.
 
 ## What n8n is genuinely better at
 
