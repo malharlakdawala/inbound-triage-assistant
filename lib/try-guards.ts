@@ -96,17 +96,33 @@ export async function applyGuards(
   }
 
   // --- guards 1 & 2: per-IP burst and global daily cap ---------------------
-  // Both counters live in KV. KV is eventually consistent, so read-then-write can
-  // undercount under a burst — measured: 8 rapid calls registered as 5. That is
-  // acceptable for a demo spend ceiling (the overshoot is cents, and the cap
-  // still binds within a few requests) but it is NOT a billing control. A
-  // Durable Object gives true atomicity and is the fix if this ever metered
-  // anything that mattered.
+  // Both counters live in KV, and the measured behaviour is worse than the
+  // eventual-consistency hand-wave I first wrote here. Numbers from a controlled
+  // probe against the live deployment (fixed IP, fixed minute bucket, 8 calls in
+  // 9 seconds), via the now-removed /api/guard-debug endpoint:
   //
-  // The Cloudflare rate-limit binding is kept as an extra layer where present,
-  // but it is deliberately no longer the only per-IP defence: it was bound and
-  // still did not fire in testing, and a guard that cannot be observed working
-  // should not be the one you depend on.
+  //   KV read sequence:  1, 2, 3, 4, 2, 3, 3, 4
+  //
+  // The counter climbs but reads regress, because different edge instances see
+  // different versions. Effective undercount is roughly 2x, which is why an
+  // earlier test of 7 sequential real requests never tripped a threshold of 5 —
+  // the count read ~4 when the true count was 7. PER_IP is therefore set below
+  // the intended burst ceiling to compensate.
+  //
+  // The Cloudflare rate-limit binding is called first, but do NOT read it as a
+  // working layer: measured against the same probe it returned success=true on
+  // all 8 calls with an identical key against a configured 5-per-60s limit. It is
+  // bound, it does not throw, and it does not enforce. It is left in place
+  // because it costs nothing and may start working, and documented as inert
+  // because a guard nobody has watched bind is a hope, not a guard.
+  //
+  // The honest summary: the daily cap is a real spend ceiling (a ~2x overshoot on
+  // a 150/day budget is still bounded at a few dollars), and the per-minute burst
+  // limit is best-effort only. A Durable Object is the correct primitive for both
+  // — it gives true atomic counters. It is not built here because exporting a DO
+  // class from an OpenNext-generated worker means wrapping its entrypoint, which
+  // is a real change to the deploy path and out of proportion to a demo whose
+  // worst case is a few dollars. That is a judgement, not an oversight.
   const rateLimited = () =>
     NextResponse.json(
       {

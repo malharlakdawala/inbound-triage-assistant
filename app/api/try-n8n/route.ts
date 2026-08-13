@@ -23,7 +23,9 @@ import { applyGuards, getEnv, str, MAX_BODY_CHARS, MAX_FIELD_CHARS } from '@/lib
 export const runtime = 'nodejs';
 
 const DAILY_CAP = 150;
-const PER_IP_PER_MINUTE = 5;
+// See lib/try-guards.ts: the KV counter undercounts ~2x, so 3 is what yields an
+// effective ceiling near 5 per minute.
+const PER_IP_PER_MINUTE = 3;
 
 /** Measured p95 for this workflow is ~6s; 60s is a generous ceiling that still bounds a hang. */
 const TIMEOUT_MS = 60_000;

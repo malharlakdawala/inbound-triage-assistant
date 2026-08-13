@@ -18,7 +18,10 @@ import { applyGuards, str, MAX_BODY_CHARS, MAX_FIELD_CHARS } from '@/lib/try-gua
 export const runtime = 'nodejs';
 
 const DAILY_CAP = 150;
-const PER_IP_PER_MINUTE = 5;
+// Set to 3, not 5, because the KV counter undercounts ~2x under bursts (measured;
+// see lib/try-guards.ts). The intent is "about 5 per minute"; 3 is what produces
+// that in practice.
+const PER_IP_PER_MINUTE = 3;
 
 export async function POST(request: Request) {
   const guard = await applyGuards(request, {

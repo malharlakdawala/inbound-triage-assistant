@@ -127,8 +127,9 @@ two backends, because letting a reviewer actually use the tool is worth more tha
 describing it. An unauthenticated endpoint calling a paid model is an API-key
 proxy, so:
 
-- **Per-IP limit** — 5/minute per backend, enforced in KV (verified: the 6th
-  request in a minute returns 429).
+- **Per-IP burst limit** — best-effort, threshold 3/minute per backend in KV.
+  Honestly labelled: see the measured behaviour below, because this one does not
+  do what I originally claimed.
 - **Global daily cap** — 150 live triages per backend, ~$1.85/day worst case on
   backend 1, resetting at 00:00 UTC.
 - **Input cap** — 2,000 characters, because cost scales with input tokens.
@@ -136,11 +137,40 @@ proxy, so:
   cannot be polluted and no write credential exists on the Worker.
 
 It **fails closed**: if the KV limiter is unreachable the endpoint returns 503
-rather than calling the model uncapped. The honest limitation is that KV is
-eventually consistent, so read-then-write can undercount under a concurrent
-burst — measured at 8 rapid calls registering as 5. It is a demo spend ceiling,
-not a billing control; a Durable Object is the correct fix if it ever metered
-anything that mattered.
+rather than calling the model uncapped.
+
+### What I measured, after claiming something false
+
+This README previously said the per-IP limit was *"verified: the 6th request in a
+minute returns 429."* I re-tested it after refactoring the guards and **could not
+reproduce it**: 7 sequential requests inside one minute all returned 200. So I
+instrumented the bindings directly (fixed IP, fixed minute bucket, 8 calls in 9
+seconds):
+
+| Layer | Configured | Measured |
+|---|---|---|
+| Cloudflare rate-limit binding | 5 per 60s | `success=true` on all 8 calls — **inert** |
+| KV read-then-write counter | monotonic | reads returned `1,2,3,4,2,3,3,4` — climbs, but regresses |
+
+Two conclusions. The Cloudflare rate-limit binding is bound and does not throw,
+and does not enforce — it is left in place because it is free and may start
+working, and documented as inert rather than counted as a layer. The KV counter
+undercounts by roughly 2×, which is why 7 real requests never tripped a threshold
+of 5; the threshold is now **3**, chosen so the effective ceiling lands near the
+intended 5.
+
+So: **the daily cap is a real spend ceiling** — a 2× overshoot on a 150/day budget
+is still bounded at a few dollars — and **the per-minute burst limit is best-effort
+only.** A Durable Object is the correct primitive for both, giving genuinely atomic
+counters. I did not build it because exporting a DO class from an
+OpenNext-generated worker means wrapping its entrypoint, which is a real change to
+the deploy path and out of proportion to a demo whose worst case is a few dollars.
+That is a judgement, and I would make the opposite one if this metered anything
+that mattered.
+
+The general lesson is the one that also produced the secret-leak fix: I had
+written the limitation down as a caveat and moved on. Writing a caveat is not
+testing it, and the measured behaviour was worse than the caveat.
 
 Both backends share **one** guard implementation ([`lib/try-guards.ts`](./lib/try-guards.ts))
 with separate counters. Copying the limiter into the second route would have meant
