@@ -182,7 +182,6 @@ function BackendPanel({
 }
 
 export default function TryForm() {
-  const [open, setOpen] = useState(false);
   const [fromName, setFromName] = useState('');
   const [fromOrg, setFromOrg] = useState('');
   const [subject, setSubject] = useState('');
@@ -242,20 +241,6 @@ export default function TryForm() {
     ]);
   }
 
-  if (!open) {
-    return (
-      <div className="try-collapsed">
-        <button type="button" className="try-open" onClick={() => setOpen(true)}>
-          Try it on your own message →
-        </button>
-        <span className="try-note">
-          Runs the same message through both backends live. Capped at 150/day each so the
-          demo cannot run up a bill.
-        </span>
-      </div>
-    );
-  }
-
   const r1 = s1.res?.result;
   const r2 = s2.res?.result;
   const agree = r1 && r2 ? r1.category === r2.category && r1.priority === r2.priority : null;
@@ -264,9 +249,7 @@ export default function TryForm() {
     <section className="try">
       <div className="try-head">
         <h2>Try it live — both backends, same message</h2>
-        <button type="button" className="try-close" onClick={() => setOpen(false)}>
-          close
-        </button>
+        <span className="try-live">live</span>
       </div>
       <p className="try-sub">
         One message, two independent implementations of the same pipeline: sentinel

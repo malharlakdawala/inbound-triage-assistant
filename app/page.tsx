@@ -22,11 +22,16 @@ export default async function Page() {
 
   return (
     <main>
-      <h1>Inbound triage</h1>
-      <p className="sub">
-        Northwind Advisors shared inbox · summary, category, priority and next action per message,
-        produced by claude-opus-5 under a validated schema.
-      </p>
+      <header className="masthead">
+        <span className="eyebrow">Northwind Advisors · shared inbox</span>
+        <h1>Inbound triage</h1>
+        <p className="sub">
+          Every message gets a one-line summary, a category, a priority and a{' '}
+          <strong>concrete next action</strong> — produced by an LLM under a validated
+          schema, so a malformed message or a failed call degrades to a flagged row
+          instead of a crash.
+        </p>
+      </header>
 
       {error ? (
         <div className="err">

@@ -41,28 +41,44 @@ export default function QueueView({ rows }: { rows: QueueRow[] }) {
 
   return (
     <>
-      <div className="stats">
-        <span>
-          messages <b>{rows.length}</b>
+      <div className="section-head">
+        <h2>Triage queue</h2>
+        <span className="section-note">
+          Stored results, ordered by what needs attention first
         </span>
-        <span>
-          needs review <b>{counts.review}</b>
-        </span>
-        <span>
-          degraded rows <b>{degraded}</b>
-        </span>
-        <span>
-          median latency <b>{medianLatency}ms</b>
-        </span>
-        <span>
-          run cost <b>${totalCost.toFixed(4)}</b>
-        </span>
-        <span>
-          model <b>{rows.find((r) => r.model)?.model ?? '—'}</b>
-        </span>
-        <span>
-          prompt <b>{rows.find((r) => r.prompt_version)?.prompt_version ?? '—'}</b>
-        </span>
+      </div>
+
+      <div className="stat-grid">
+        <div className="stat">
+          <span className="stat-label">Messages</span>
+          <span className="stat-value">{rows.length}</span>
+        </div>
+        <div className={`stat${counts.review > 0 ? ' flagged' : ''}`}>
+          <span className="stat-label">Needs review</span>
+          <span className="stat-value">{counts.review}</span>
+        </div>
+        <div className={`stat${degraded > 0 ? ' flagged' : ''}`}>
+          <span className="stat-label">Degraded rows</span>
+          <span className="stat-value">{degraded}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Median latency</span>
+          <span className="stat-value">{medianLatency}ms</span>
+        </div>
+        <div className="stat accent">
+          <span className="stat-label">Run cost</span>
+          <span className="stat-value">${totalCost.toFixed(4)}</span>
+        </div>
+        {/* Model and prompt version share one tile: they are read together (a
+            number is only meaningful for a given model+prompt pair), and pairing
+            them makes the row of tiles come out even. */}
+        <div className="stat wide">
+          <span className="stat-label">Model</span>
+          <span className="stat-value small">{rows.find((r) => r.model)?.model ?? '—'}</span>
+          <span className="stat-sub">
+            prompt {rows.find((r) => r.prompt_version)?.prompt_version ?? '—'}
+          </span>
+        </div>
       </div>
 
       <div className="controls">
@@ -89,8 +105,12 @@ export default function QueueView({ rows }: { rows: QueueRow[] }) {
 function Card({ row: r }: { row: QueueRow }) {
   const triaged = r.category != null;
 
+  // The priority stripe is a class rather than an inline style so the palette
+  // stays in one file.
+  const stripe = r.priority ? ` p-${r.priority}` : '';
+
   return (
-    <article className={`card${r.needs_review ? ' review' : ''}`}>
+    <article className={`card${stripe}${r.needs_review ? ' review' : ''}`}>
       <div className="card-top">
         <div>
           <div className="who">
