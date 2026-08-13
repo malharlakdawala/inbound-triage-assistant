@@ -51,6 +51,15 @@ large prospect to the top of the queue regardless of whether anyone needs to act
 today. A production version would carry a separate `value` or `qualification`
 field rather than smuggling it into priority.
 
+**Ordering is part of the taxonomy decision, not just presentation.** The queue
+sorts actionable rows first, then priority rank, then confidence descending, with
+flagged rows last. `needs_review` does the first step alone, and deliberately so:
+it is already true when the category is `unclear`, when confidence is below the
+review threshold, or when triage degraded — so one flag sinks unclear *and*
+low-confidence rows without a second sort double-counting the same signal. The
+tradeoff is that ambiguous rows are now less visible, which is only acceptable
+because a "needs review" filter pulls them back in one click.
+
 **If the taxonomy doubled tomorrow, the database would not move.** Categories and
 priorities are rows in `arootah_triage.categories` / `.priorities`, and `results`
 references them by foreign key. Adding a category is an `INSERT` plus a line in
@@ -385,20 +394,49 @@ evidence base is not, and no amount of engineering substitutes for it.
 ### Also worth naming
 
 - **The public try-it form is the one place the deployment spends money, and the
-  guards there took three attempts to get right.** Version one wrapped each check
-  in `if (binding)`, so a missing binding silently disabled the limit — fail-open
-  on a spend guard. Version two added a KV limiter but I concluded from a bad test
-  that it did not work; in fact my seven sequential probes straddled a minute
-  boundary, because each call takes ~5s. Only after instrumenting the runtime to
-  print which bindings were actually visible did I confirm both were bound and the
-  limiter was functioning. It now fails closed (503 rather than an uncapped call),
-  caps at 150/day and 5/minute/IP, and never writes to the database.
+  spend guard was broken twice — the second time after I had already written that
+  it worked.** Version one wrapped each check in `if (binding)`, so a missing
+  binding silently disabled the limit: fail-open on a spend guard. That was fixed
+  to fail closed (503 rather than an uncapped call).
 
-  Two lessons I would repeat. First, a guard you have not seen reject something is
-  not a guard — I asserted "rate limited" twice before observing a 429. Second, KV
-  is eventually consistent, so read-then-write undercounts under concurrency
-  (measured: 8 rapid calls registered as 5). That makes this a demo ceiling, not a
-  billing control, and I would use a Durable Object for anything real.
+  An earlier draft of this document then claimed I had "confirmed both were bound
+  and the limiter was functioning". When a second public endpoint was added and
+  the guards were refactored into one shared module, I re-tested and **could not
+  reproduce it**: seven sequential requests inside a single minute all returned
+  200 against a documented 5/minute cap. Instrumenting the two layers directly
+  (fixed IP, fixed minute bucket, 8 calls in 9 seconds) gave the real picture:
+
+  | layer | configured | measured |
+  |---|---|---|
+  | Cloudflare rate-limit binding | 5 per 60s | `success=true` on all 8 calls — **inert** |
+  | KV read-then-write counter | monotonic | reads returned `1,2,3,4,2,3,3,4` |
+
+  The Cloudflare binding is bound, does not throw, and does not enforce; it is
+  left in place as free redundancy and documented as inert rather than counted as
+  a layer. The KV counter climbs but its reads regress, because different edge
+  instances see different versions — an effective ~2× undercount, which is exactly
+  why seven real requests never tripped a threshold of five. The threshold is now
+  **3**, so the effective ceiling lands near the intended 5, and that *is*
+  verified: requests 4 through 7 in one minute return 429.
+
+  So the honest position is split. The **daily cap is a real spend ceiling** — a
+  2× overshoot on a 150/day budget is still bounded at a few dollars. The
+  **per-minute burst limit is best-effort only.** A Durable Object is the correct
+  primitive for both, giving genuinely atomic counters; I did not build one because
+  exporting a Durable Object class from an OpenNext-generated worker means wrapping
+  its entrypoint, which is a real change to the deploy path and out of proportion
+  to a demo whose worst case is a few dollars. That is a judgement, and I would
+  make the opposite one if this metered anything that mattered.
+
+  Three lessons, and the third is the one I would actually repeat. First, a guard
+  you have not seen reject something is not a guard — I asserted "rate limited"
+  twice before ever observing a 429. Second, timing tests need controlling: an
+  earlier round of probes straddled a minute boundary because each call takes ~5s,
+  which produced a *false negative* and sent me looking for a bug that was not
+  there. Third, and worst: **I wrote the limitation down as a caveat and treated
+  writing it down as having handled it.** The measured behaviour was worse than
+  the caveat. This is the same failure as the secret leak below — a claim about
+  the system, published before it was tested.
 
 - **The deployed app holds no write credential.** It holds only the publishable
   Supabase key and no LLM credential, so a public URL over a paid API is not an
