@@ -72,16 +72,38 @@ export interface QueueRow {
 }
 
 /**
- * The read path used by the deployed app. Sorts unactioned/urgent work first:
- * review queue, then priority rank, then arrival order.
+ * The read path used by the deployed app.
+ *
+ * Ordering is a product decision, so it is stated explicitly rather than left to
+ * the view: **work you can act on, most confident first; anything ambiguous sinks
+ * to the bottom.**
+ *
+ *   1. needs_review ascending — actionable rows first, flagged rows last.
+ *   2. priority_rank ascending — high before medium before low.
+ *   3. confidence descending — the surest call at the top of each band.
+ *   4. received_at ascending — a stable tiebreak, so the order never shuffles
+ *      between renders.
+ *
+ * `needs_review` does the heavy lifting for step 1 and it is worth being clear
+ * why: it is already true when the category is `unclear`, when confidence falls
+ * below the review threshold, or when triage degraded. So one flag pushes both
+ * the unclear rows and the low-confidence rows to the bottom — there is no
+ * separate "is it unclear" sort, because that would double-count the same signal.
+ *
+ * This inverts what the first version did, which surfaced the review queue at the
+ * top. Both are defensible; the tradeoff is that ambiguous rows are now less
+ * visible, which is the right call only because the "needs review" filter exists
+ * to pull them back in one click. If nobody ever clicked that filter, burying
+ * them would be how ambiguous messages quietly rot.
  */
 export async function fetchQueue(): Promise<QueueRow[]> {
   const supabase = readClient();
   const { data, error } = await supabase
     .from('queue')
     .select('*')
-    .order('needs_review', { ascending: false, nullsFirst: false })
+    .order('needs_review', { ascending: true, nullsFirst: false })
     .order('priority_rank', { ascending: true, nullsFirst: false })
+    .order('confidence', { ascending: false, nullsFirst: false })
     .order('received_at', { ascending: true });
 
   if (error) throw new Error(`Supabase read failed: ${error.message}`);

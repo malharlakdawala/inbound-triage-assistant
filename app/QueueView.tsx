@@ -44,7 +44,7 @@ export default function QueueView({ rows }: { rows: QueueRow[] }) {
       <div className="section-head">
         <h2>Triage queue</h2>
         <span className="section-note">
-          Stored results, ordered by what needs attention first
+          Actionable first — priority, then confidence. Flagged rows sink to the bottom.
         </span>
       </div>
 
