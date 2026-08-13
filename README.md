@@ -165,9 +165,10 @@ workflow — 12 nodes, import-ready at
 answer "code or workflow?" with evidence rather than opinion.
 
 There are two n8n variants: one calling the same hosted `claude-opus-5`, and one
-calling a **local Ollama model** with an n8n Data table instead of Supabase — zero
-per-call cost and no client data leaving the server, at the price of no
-schema-constrained decoding and unmeasured accuracy.
+calling **Ollama** with an n8n Data table instead of Supabase. The Ollama route
+trades schema-constrained decoding for a self-hostable model — the privacy win is
+real only if Ollama runs on your own hardware, which is a distinction I initially
+got wrong and corrected in the comparison doc.
 
 Short version: **code for the pipeline, n8n for the edges.** The triage step has a
 schema contract and an eval harness, so it belongs in typed code where the contract

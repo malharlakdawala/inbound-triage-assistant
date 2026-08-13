@@ -22,7 +22,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "const b = $json.body ?? $json;\n\nconst ORG_SENTINELS = ['(individual)', '(unknown)', '(none)', 'n/a', 'unknown', ''];\nconst CORRUPTION_MARKERS = ['=?utf-8?', '=?iso-8859', 'content-type: multipart', '--- forwarded message truncated ---', 'boundary='];\n\nconst NUL = 0;\nconst REPLACEMENT = 65533;\n\nfunction cleanText(raw) {\n  const cleaned = [];\n  const src = String(raw == null ? '' : raw);\n  let hadNul = false;\n  let hadReplacement = false;\n  let hadControl = false;\n  let out = '';\n  for (let i = 0; i < src.length; i++) {\n    const ch = src[i];\n    const c = src.charCodeAt(i);\n    if (c === NUL) { hadNul = true; continue; }\n    if (c === REPLACEMENT) { hadReplacement = true; continue; }\n    if ((c < 32 && c !== 9 && c !== 10 && c !== 13) || c === 127) { hadControl = true; continue; }\n    out += ch;\n  }\n  if (hadNul) cleaned.push('NUL bytes (U+0000)');\n  if (hadReplacement) cleaned.push('U+FFFD replacement characters - evidence of an earlier decode failure');\n  if (hadControl) cleaned.push('other C0 control characters');\n  let collapsed = '';\n  let prevSpace = false;\n  for (let j = 0; j < out.length; j++) {\n    const ch2 = out[j];\n    const isSpace = ch2 === ' ' || ch2 === '\\t';\n    if (isSpace && prevSpace) continue;\n    collapsed += isSpace ? ' ' : ch2;\n    prevSpace = isSpace;\n  }\n  return { text: collapsed.trim(), cleaned: cleaned };\n}\n\nfunction blankToNull(v) {\n  const t = String(v == null ? '' : v).trim();\n  return t.length ? t : null;\n}\n\nfunction alnumCount(s) {\n  const str = String(s == null ? '' : s);\n  let n = 0;\n  for (let i = 0; i < str.length; i++) {\n    const c = str.charCodeAt(i);\n    if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c > 127) n++;\n  }\n  return n;\n}\n\nconst bodyClean = cleanText(b.body);\nconst subjClean = cleanText(b.subject);\nconst nameClean = cleanText(b.from_name);\n\nconst rawOrg = String(b.from_org == null ? '' : b.from_org).trim();\nconst from_org = ORG_SENTINELS.indexOf(rawOrg.toLowerCase()) !== -1 ? null : blankToNull(rawOrg);\n\nconst mimeWord = new RegExp('=\\\\?[\\\\w-]+\\\\?[bq]\\\\?', 'i');\nconst nameLooksCorrupt = mimeWord.test(nameClean.text);\nconst from_name = nameLooksCorrupt ? null : blankToNull(nameClean.text);\nconst subject = blankToNull(subjClean.text);\nconst body = bodyClean.text;\n\nconst reasons = [];\nconst chars = alnumCount(body) + alnumCount(subject);\nif (chars < 15) reasons.push('only ' + chars + ' alphanumeric characters in subject+body');\nconst lower = body.toLowerCase();\nlet firstMarker = null;\nfor (let k = 0; k < CORRUPTION_MARKERS.length; k++) {\n  if (lower.indexOf(CORRUPTION_MARKERS[k]) !== -1) { firstMarker = CORRUPTION_MARKERS[k]; break; }\n}\nif (firstMarker) reasons.push('transport corruption markers present (' + firstMarker + ')');\nif (nameLooksCorrupt) reasons.push('sender name is an undecoded MIME encoded-word');\n\nconst systemPrompt =\n  'You triage the shared inbox of Northwind Advisors, an alternative-investment and family-office advisory firm. Someone on the operations team reads each message and routes it. You do that first pass.\\n\\n' +\n  'Reply with a single JSON object and nothing else. No markdown fence, no commentary.\\n\\n' +\n  'Required shape:\\n' +\n  '{\"summary\": string, \"category\": string, \"priority\": string, \"next_action\": string, \"confidence\": number, \"reasoning\": string}\\n\\n' +\n  'category must be exactly one of: prospect, existing_client, vendor, recruiter, partner_referral, noise, unclear\\n' +\n  '  prospect - a potential new client enquiring for themselves or their family (routes to advisor / business development)\\n' +\n  '  existing_client - a current client making a request, asking a question, or complaining (routes to client service)\\n' +\n  '  vendor - someone selling a product or service to the firm (routes to operations)\\n' +\n  '  recruiter - talent or recruiting outreach (no action)\\n' +\n  '  partner_referral - another firm proposing a referral or partnership, or introducing someone (routes to partnerships)\\n' +\n  '  noise - automated mail, newsletters, marketing blasts (no action, archive)\\n' +\n  '  unclear - not enough signal to classify. Use this rather than guessing (routes to a human)\\n\\n' +\n  'priority must be exactly one of: high, medium, low\\n' +\n  '  high - money or a mandate is at stake now, a stated deadline within about 48 hours, or an unhappy existing client\\n' +\n  '  medium - a real opportunity or genuine client request with no hard deadline\\n' +\n  '  low - no action needed, automated, or the sender says it is not urgent\\n\\n' +\n  'confidence must be a number between 0 and 1.\\n\\n' +\n  'Judgement rules:\\n' +\n  'Urgency and value are different. A well-qualified prospect who says there is no rush is low priority, because priority orders the work queue rather than scoring the opportunity.\\n' +\n  'An unhappy existing client is high priority even with no deadline. Complaints are how clients leave.\\n' +\n  'A warm introduction from a named existing client carries more weight than a cold enquiry.\\n' +\n  'If you cannot tell who the sender is or what they want, answer unclear with confidence below 0.5. That is correct, not a failure. A confident wrong label routes the message to the wrong team, which is worse than sending it to a human. A missing organisation means the sender is probably a private individual, not that they are suspicious.\\n' +\n  'Messages corrupted by mail transport - undecoded MIME headers, truncation markers, an effectively empty body - are unclear with low confidence. Do not reconstruct what they might have said.\\n\\n' +\n  'summary: one line, about 20 words, stating what the sender wants. No preamble.\\n' +\n  'next_action: the single next step as an imperative for whoever picks this up. Name the person if known.\\n' +\n  'reasoning: one short sentence naming the rule or words you relied on.';\n\nlet userPrompt = 'Triage this message.\\n\\n';\nuserPrompt += 'Channel: ' + (blankToNull(b.channel) || 'unknown') + '\\n';\nuserPrompt += 'Sender name: ' + (from_name || '(not provided)') + '\\n';\nuserPrompt += 'Sender organisation: ' + (from_org || '(not provided)') + '\\n';\nuserPrompt += 'Subject: ' + (subject || '(no subject)') + '\\n\\n';\nuserPrompt += 'Body:\\n' + (body.length ? body : '(empty)');\nif (reasons.length) {\n  userPrompt += '\\n\\nNote from preprocessing: this message looks low-signal (' + reasons.join('; ') + ').';\n}\nif (bodyClean.cleaned.length) {\n  userPrompt += '\\nNote from preprocessing: removed ' + bodyClean.cleaned.join('; ') + '.';\n}\nuserPrompt += '\\n\\nRespond with the JSON object only.';\n\nreturn {\n  json: {\n    message_id: blankToNull(b.id) || ('n8n-' + $execution.id),\n    received_at: blankToNull(b.received_at) || new Date().toISOString(),\n    channel: blankToNull(b.channel) || 'unknown',\n    from_name: from_name,\n    from_org: from_org,\n    subject: subject,\n    body: body,\n    low_signal: reasons.length > 0,\n    low_signal_reasons: reasons,\n    cleaned: bodyClean.cleaned.concat(subjClean.cleaned).concat(nameClean.cleaned),\n    prompt_version: 'v2-ollama',\n    systemPrompt: systemPrompt,\n    userPrompt: userPrompt\n  }\n};"
+        "jsCode": "const b = $json.body ?? $json;\n\nconst ORG_SENTINELS = ['(individual)', '(unknown)', '(none)', 'n/a', 'unknown', ''];\nconst CORRUPTION_MARKERS = ['=?utf-8?', '=?iso-8859', 'content-type: multipart', '--- forwarded message truncated ---', 'boundary='];\n\nconst NUL = 0;\nconst REPLACEMENT = 65533;\n\nfunction cleanText(raw) {\n  const cleaned = [];\n  const src = String(raw == null ? '' : raw);\n  let hadNul = false;\n  let hadReplacement = false;\n  let hadControl = false;\n  let out = '';\n  for (let i = 0; i < src.length; i++) {\n    const ch = src[i];\n    const c = src.charCodeAt(i);\n    if (c === NUL) { hadNul = true; continue; }\n    if (c === REPLACEMENT) { hadReplacement = true; continue; }\n    if ((c < 32 && c !== 9 && c !== 10 && c !== 13) || c === 127) { hadControl = true; continue; }\n    out += ch;\n  }\n  if (hadNul) cleaned.push('NUL bytes (U+0000)');\n  if (hadReplacement) cleaned.push('U+FFFD replacement characters - evidence of an earlier decode failure');\n  if (hadControl) cleaned.push('other C0 control characters');\n  let collapsed = '';\n  let prevSpace = false;\n  for (let j = 0; j < out.length; j++) {\n    const ch2 = out[j];\n    const isSpace = ch2 === ' ' || ch2 === '\\t';\n    if (isSpace && prevSpace) continue;\n    collapsed += isSpace ? ' ' : ch2;\n    prevSpace = isSpace;\n  }\n  return { text: collapsed.trim(), cleaned: cleaned };\n}\n\nfunction blankToNull(v) {\n  const t = String(v == null ? '' : v).trim();\n  return t.length ? t : null;\n}\n\nfunction alnumCount(s) {\n  const str = String(s == null ? '' : s);\n  let n = 0;\n  for (let i = 0; i < str.length; i++) {\n    const c = str.charCodeAt(i);\n    if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c > 127) n++;\n  }\n  return n;\n}\n\nconst bodyClean = cleanText(b.body);\nconst subjClean = cleanText(b.subject);\nconst nameClean = cleanText(b.from_name);\n\nconst rawOrg = String(b.from_org == null ? '' : b.from_org).trim();\nconst from_org = ORG_SENTINELS.indexOf(rawOrg.toLowerCase()) !== -1 ? null : blankToNull(rawOrg);\n\nconst mimeWord = new RegExp('=\\\\?[\\\\w-]+\\\\?[bq]\\\\?', 'i');\nconst nameLooksCorrupt = mimeWord.test(nameClean.text);\nconst from_name = nameLooksCorrupt ? null : blankToNull(nameClean.text);\nconst subject = blankToNull(subjClean.text);\nconst body = bodyClean.text;\n\nconst reasons = [];\nconst chars = alnumCount(body) + alnumCount(subject);\nif (chars < 15) reasons.push('only ' + chars + ' alphanumeric characters in subject+body');\nconst lower = body.toLowerCase();\nlet firstMarker = null;\nfor (let k = 0; k < CORRUPTION_MARKERS.length; k++) {\n  if (lower.indexOf(CORRUPTION_MARKERS[k]) !== -1) { firstMarker = CORRUPTION_MARKERS[k]; break; }\n}\nif (firstMarker) reasons.push('transport corruption markers present (' + firstMarker + ')');\nif (nameLooksCorrupt) reasons.push('sender name is an undecoded MIME encoded-word');\n\nconst systemPrompt =\n  'You triage the shared inbox of Northwind Advisors, an alternative-investment and family-office advisory firm. Someone on the operations team reads each message and routes it. You do that first pass.\\n\\n' +\n  'Reply with a single JSON object and nothing else. No markdown fence, no commentary.\\n\\n' +\n  'Required keys, all of them, and no others:\\n' +\n  'summary (string), category (string), priority (string), next_action (string), confidence (number), reasoning (string)\\n\\n' +\n  'category must be exactly one of: prospect, existing_client, vendor, recruiter, partner_referral, noise, unclear\\n' +\n  '  prospect - a potential new client enquiring for themselves or their family (routes to advisor / business development)\\n' +\n  '  existing_client - a current client making a request, asking a question, or complaining (routes to client service)\\n' +\n  '  vendor - someone selling a product or service to the firm (routes to operations)\\n' +\n  '  recruiter - talent or recruiting outreach (no action)\\n' +\n  '  partner_referral - another firm proposing a referral or partnership, or introducing someone (routes to partnerships)\\n' +\n  '  noise - automated mail, newsletters, marketing blasts (no action, archive)\\n' +\n  '  unclear - not enough signal to classify. Use this rather than guessing (routes to a human)\\n\\n' +\n  'priority must be exactly one of: high, medium, low\\n' +\n  '  high - money or a mandate is at stake now, a stated deadline within about 48 hours, or an unhappy existing client\\n' +\n  '  medium - a real opportunity or genuine client request with no hard deadline\\n' +\n  '  low - no action needed, automated, or the sender says it is not urgent\\n\\n' +\n  'confidence must be a number between 0 and 1.\\n\\n' +\n  'Judgement rules:\\n' +\n  'Urgency and value are different. A well-qualified prospect who says there is no rush is low priority, because priority orders the work queue rather than scoring the opportunity.\\n' +\n  'An unhappy existing client is high priority even with no deadline. Complaints are how clients leave.\\n' +\n  'A warm introduction from a named existing client carries more weight than a cold enquiry.\\n' +\n  'If you cannot tell who the sender is or what they want, answer unclear with confidence below 0.5. That is correct, not a failure. A confident wrong label routes the message to the wrong team, which is worse than sending it to a human. A missing organisation means the sender is probably a private individual, not that they are suspicious.\\n' +\n  'Messages corrupted by mail transport - undecoded MIME headers, truncation markers, an effectively empty body - are unclear with low confidence. Do not reconstruct what they might have said.\\n\\n' +\n  'summary: one line, about 20 words, stating what the sender wants. No preamble.\\n' +\n  'next_action: the single next step as an imperative for whoever picks this up. Name the person if known.\\n' +\n  'reasoning: one short sentence naming the rule or words you relied on.';\n\n// chainLlm renders this through a LangChain prompt template, where a single\n// brace opens a template variable. Inbound message bodies are arbitrary text and\n// routinely contain braces, so double them - LangChain renders '{{' as '{'.\nfunction escapeBraces(s) {\n  return String(s == null ? '' : s).split('{').join('{{').split('}').join('}}');\n}\n\nlet userPrompt = 'Triage this message.\\n\\n';\nuserPrompt += 'Channel: ' + (blankToNull(b.channel) || 'unknown') + '\\n';\nuserPrompt += 'Sender name: ' + (from_name || '(not provided)') + '\\n';\nuserPrompt += 'Sender organisation: ' + (from_org || '(not provided)') + '\\n';\nuserPrompt += 'Subject: ' + (subject || '(no subject)') + '\\n\\n';\nuserPrompt += 'Body:\\n' + (body.length ? body : '(empty)');\nif (reasons.length) {\n  userPrompt += '\\n\\nNote from preprocessing: this message looks low-signal (' + reasons.join('; ') + ').';\n}\nif (bodyClean.cleaned.length) {\n  userPrompt += '\\nNote from preprocessing: removed ' + bodyClean.cleaned.join('; ') + '.';\n}\nuserPrompt += '\\n\\nRespond with the JSON object only.';\n\nreturn {\n  json: {\n    message_id: blankToNull(b.id) || ('n8n-' + $execution.id),\n    received_at: blankToNull(b.received_at) || new Date().toISOString(),\n    channel: blankToNull(b.channel) || 'unknown',\n    from_name: from_name,\n    from_org: from_org,\n    subject: subject,\n    body: body,\n    low_signal: reasons.length > 0,\n    low_signal_reasons: reasons,\n    cleaned: bodyClean.cleaned.concat(subjClean.cleaned).concat(nameClean.cleaned),\n    prompt_version: 'v2-ollama',\n    systemPrompt: systemPrompt,\n    userPrompt: escapeBraces(userPrompt)\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -32,44 +32,6 @@
       ],
       "id": "normalize-message",
       "name": "Normalize Message"
-    },
-    {
-      "parameters": {
-        "resource": "text",
-        "operation": "message",
-        "modelId": {
-          "__rl": true,
-          "mode": "list",
-          "value": ""
-        },
-        "messages": {
-          "values": [
-            {
-              "role": "user",
-              "content": "={{ $json.userPrompt }}"
-            }
-          ]
-        },
-        "simplify": true,
-        "options": {
-          "system": "={{ $json.systemPrompt }}",
-          "think": false,
-          "format": "json",
-          "num_predict": 700,
-          "num_ctx": 8192,
-          "temperature": 0.1
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.ollama",
-      "typeVersion": 1,
-      "position": [
-        -440,
-        0
-      ],
-      "id": "triage-via-ollama",
-      "name": "Triage via Ollama",
-      "onError": "continueRegularOutput",
-      "credentials": {}
     },
     {
       "parameters": {
@@ -300,7 +262,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "const src = $('Normalize Message').item.json;\nconst issues = $json.issues || [];\nconst repairPrompt = src.userPrompt +\n  '\\n\\nYour previous response was rejected: ' + issues.join('; ') +\n  '. Reply with the JSON object only. Use only the allowed category and priority values, and keep confidence between 0 and 1.';\nreturn { json: { systemPrompt: src.systemPrompt, userPrompt: repairPrompt } };"
+        "jsCode": "const src = $('Normalize Message').item.json;\nconst issues = $json.issues || [];\nconst detail = String(issues.join('; ')).split('{').join('{{').split('}').join('}}');\nconst repairPrompt = src.userPrompt +\n  '\\n\\nYour previous response was rejected: ' + detail +\n  '. Reply with the JSON object only. Use only the allowed category and priority values, and keep confidence between 0 and 1.';\nreturn { json: { systemPrompt: src.systemPrompt, userPrompt: repairPrompt } };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -310,44 +272,6 @@
       ],
       "id": "build-repair-prompt",
       "name": "Build Repair Prompt"
-    },
-    {
-      "parameters": {
-        "resource": "text",
-        "operation": "message",
-        "modelId": {
-          "__rl": true,
-          "mode": "list",
-          "value": ""
-        },
-        "messages": {
-          "values": [
-            {
-              "role": "user",
-              "content": "={{ $json.userPrompt }}"
-            }
-          ]
-        },
-        "simplify": true,
-        "options": {
-          "system": "={{ $json.systemPrompt }}",
-          "think": false,
-          "format": "json",
-          "num_predict": 700,
-          "num_ctx": 8192,
-          "temperature": 0
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.ollama",
-      "typeVersion": 1,
-      "position": [
-        440,
-        220
-      ],
-      "id": "repair-attempt",
-      "name": "Repair Attempt",
-      "onError": "continueRegularOutput",
-      "credentials": {}
     },
     {
       "parameters": {
@@ -383,9 +307,9 @@
     },
     {
       "parameters": {
-        "content": "## n8n backend - Ollama + Data table\n\nSelf-contained: a local Ollama model does the triage and an n8n Data table stores the result, so nothing leaves this server and there is no per-call cost. For a firm handling client financial data that is the strongest argument for this variant.\n\n**Two things differ from the Next.js implementation, and both matter.** Ollama offers `format: json` only, not schema-constrained decoding - so `Validate Against Schema` is the actual contract enforcement here, not a second line of defence, and the repair retry is expected to fire in normal use. And the model is local, so accuracy is not the measured claude-opus-5 figure.\n\n**Before running:**\n1. Pick your model on *Triage via Ollama* and *Repair Attempt*.\n2. Attach your Ollama credential to both.\n3. Create a Data table named `arootah_triage_results` with the columns listed in the Store node.\n\nSee docs/BACKEND_COMPARISON.md in the repo.",
-        "height": 420,
-        "width": 480,
+        "content": "## n8n backend - Ollama + Data table\n\nPipeline: normalise, LLM chain, schema validation, one repair retry, deterministic fallback, Data table insert, respond.\n\n### Set these before running\n1. **Model** on both `Ollama Model` nodes - left EMPTY on purpose. Every model previously used on this instance (ministral-3:14b, ministral-3:8b, qwen3-next:80b, qwen3-vl:235b, cogito-2.1:671b) has been RETIRED by the provider. Pick a currently-available one.\n2. **Data table** named `arootah_triage_results` (see the Store node for columns).\n\n### Two design notes\nOllama exposes `format: json` only - not schema-constrained decoding. So `Validate Against Schema` is the actual contract enforcement here, and the repair retry is expected to fire in normal use.\n\n`chainLlm` renders prompts through a LangChain template, where `{` opens a variable. The system prompt avoids literal braces and the Code node doubles braces in the user prompt - otherwise any message containing a brace breaks the run.\n\nSee docs/BACKEND_COMPARISON.md.",
+        "height": 520,
+        "width": 520,
         "color": 4
       },
       "type": "n8n-nodes-base.stickyNote",
@@ -396,6 +320,104 @@
       ],
       "id": "explainer",
       "name": "Explainer"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userPrompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "={{ $json.systemPrompt }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -440,
+        0
+      ],
+      "id": "triage-via-ollama",
+      "name": "Triage via Ollama",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "",
+        "options": {
+          "temperature": 0.1,
+          "format": "json",
+          "numCtx": 8192,
+          "numPredict": 700,
+          "keepAlive": "10m"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        200
+      ],
+      "id": "ollama-model",
+      "name": "Ollama Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "v6mUQL730zRk0nKg",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userPrompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "={{ $json.systemPrompt }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        440,
+        220
+      ],
+      "id": "repair-attempt",
+      "name": "Repair Attempt",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "",
+        "options": {
+          "temperature": 0,
+          "format": "json",
+          "numCtx": 8192,
+          "numPredict": 700,
+          "keepAlive": "10m"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        440,
+        420
+      ],
+      "id": "ollama-model-repair",
+      "name": "Ollama Model (Repair)",
+      "credentials": {
+        "ollamaApi": {
+          "id": "v6mUQL730zRk0nKg",
+          "name": "Ollama account"
+        }
+      }
     }
   ],
   "connections": {
@@ -500,6 +522,28 @@
           {
             "node": "Respond After Repair",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Triage via Ollama",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model (Repair)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Repair Attempt",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]

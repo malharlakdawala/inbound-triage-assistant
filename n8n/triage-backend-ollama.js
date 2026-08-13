@@ -72,7 +72,7 @@ const callOllama = node({
     parameters: {
       resource: 'text',
       operation: 'message',
-      modelId: { __rl: true, mode: 'list', value: '' },
+      modelId: { __rl: true, mode: 'id', value: 'qwen3-next:80b' },
       messages: { values: [{ role: 'user', content: expr('{{ $json.userPrompt }}') }] },
       simplify: true,
       options: {
@@ -164,7 +164,7 @@ const callOllamaRepair = node({
     parameters: {
       resource: 'text',
       operation: 'message',
-      modelId: { __rl: true, mode: 'list', value: '' },
+      modelId: { __rl: true, mode: 'id', value: 'qwen3-next:80b' },
       messages: { values: [{ role: 'user', content: expr('{{ $json.userPrompt }}') }] },
       simplify: true,
       options: {
