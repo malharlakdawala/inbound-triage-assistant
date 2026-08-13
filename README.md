@@ -157,6 +157,21 @@ review queue for free, which for an ops team is worth more than the query
 flexibility it costs. I would reach for it if the reviewers were the advisors
 themselves.
 
+## Two backends
+
+The primary implementation is Next.js. The same pipeline also exists as an n8n
+workflow (`n8n/triage-backend-workflow.js`, 12 nodes), built to answer "code or
+workflow?" with evidence rather than opinion.
+
+Short version: **code for the pipeline, n8n for the edges.** The triage step has a
+schema contract and an eval harness, so it belongs in typed code where the contract
+is enforced once. Escalation and routing change often and are owned by operations,
+so they belong in n8n. The cost of the workflow version is that the schema and the
+prompt get written twice and nothing warns you when the two copies drift.
+
+Full comparison, including where I would flip that judgement:
+**[docs/BACKEND_COMPARISON.md](./docs/BACKEND_COMPARISON.md)**
+
 ## One n8n automation I would add
 
 **Trigger:** Supabase row inserted into `arootah_triage.results` where
