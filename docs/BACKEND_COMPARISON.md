@@ -29,12 +29,12 @@ is worth much more if you have actually built both.
 | | Next.js (primary) | n8n + OpenRouter | n8n + Ollama |
 |---|---|---|---|
 | File | `lib/llm.ts` | `n8n/triage-backend-workflow.json` | `n8n/triage-backend-ollama.json` |
-| Model | `claude-opus-5` | `claude-opus-5` (same) | Ollama, your choice |
+| Model | `claude-opus-5` | `claude-opus-5` (same) | `gpt-oss:120b` (Ollama Cloud) |
 | Output enforcement | schema-constrained decoding | schema-constrained decoding | **`format: json` only** |
 | Storage | Supabase Postgres | Supabase Postgres | n8n Data table |
-| Cost per message | ~$0.0123 | ~$0.0123 | provider-dependent |
+| Cost per message | ~$0.0123 | ~$0.0123 | not measured (Ollama Cloud) |
 | Client data leaves the network | yes | yes | depends on the Ollama endpoint |
-| Measured accuracy | 13/13 category | same model, same prompt | **unmeasured** |
+| Measured accuracy | 13/13 cat, 9/13 pri | same model, same prompt | **13/13 cat, 10/13 pri** |
 | External dependencies | Supabase + LLM API | Supabase + LLM API | Ollama endpoint only |
 
 ## The Ollama variant, and why it is not simply "the same but free"
@@ -58,17 +58,52 @@ confidence — all failure modes that constrained decoding made impossible upstr
 If you want the layered-guardrails argument demonstrated rather than asserted,
 this is the variant to show. The layers here are load-bearing.
 
-**Accuracy is unmeasured and will be lower.** The 13/13 category figure was
-measured on `claude-opus-5`. A local model has not been scored on this corpus, and
-I would expect the nuanced cases to degrade first: `inb-006` (a real prospect who
-says "no rush" — low urgency, high value) and `inb-009` (a named human with no
-recoverable context, where the correct answer is to admit ignorance). Both require
-resisting an obvious-looking wrong answer, which is exactly where smaller models
-struggle.
+**Accuracy is measured now, and it is not lower.** I predicted a local/smaller model
+would degrade, especially on the nuanced cases. Run over the same 13 messages with
+the same ground truth:
 
-`npm run eval` scores whatever is in the database, so the honest way to find out is
-to drive the webhook over all 13 messages and score the responses — not to assume
-the number transfers.
+```
+model            gpt-oss:120b via Ollama Cloud, n8n backend
+category         13/13   100%
+priority         10/13    77%
+both correct     10/13    77%
+sources          llm=13   (no repairs, no fallbacks)
+needs review     3
+latency          p50 3.97s   p95 6.13s
+```
+
+Against the Next.js/`claude-opus-5` baseline of 13/13 category and **9/13** priority,
+this is *identical* on category and **one better** on priority — and faster
+(p50 3.97s vs 4.53s). My expectation was wrong, and the reason is informative:
+category accuracy appears to be carried by the taxonomy and the prompt, not by model
+capability. Both models place all thirteen messages correctly. What differs is the
+judgement call on priority, and there the two models disagree with my labels in
+almost the same places.
+
+**The repair retry did not fire, which also contradicts what I wrote.** I said that
+without schema-constrained decoding the repair path would be "expected to fire in
+normal operation." Across 13 messages it fired zero times: `format: json` plus a
+capable model produced schema-valid output every time. The layer is still justified —
+it is the only thing standing between an invalid payload and the database on this
+transport — but I should not have asserted a failure rate I had not measured.
+
+**The cross-model finding is the useful one.** The systematic under-escalation from
+RATIONALE §c reproduces here. Both models, from different labs, on different
+transports, disagree with my priority labels in the same direction and on
+overlapping cases:
+
+| id | my label | claude-opus-5 | gpt-oss:120b |
+|---|---|---|---|
+| inb-001 | high | medium | **low** |
+| inb-002 | high | medium | **high** ✓ |
+| inb-009 | medium (contested) | low | low |
+| inb-013 | high | medium | medium |
+
+Two independent models declining to escalate the same messages is much stronger
+evidence that my priority rules under-specify than one model doing it. A single
+model disagreeing is a model problem; two agreeing with each other and not with me
+is a specification problem. This is the sort of corroboration a second
+implementation buys, and it is the main reason building it was worth the time.
 
 **What it buys depends entirely on where Ollama runs, and I got this wrong first
 time.** I wrote that this variant costs nothing and keeps client data on the

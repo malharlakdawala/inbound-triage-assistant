@@ -1,0 +1,119 @@
+{
+  "inb-001": {
+    "category": "prospect",
+    "priority": "low",
+    "confidence": 0.96,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Gregory Palmer seeks tax-efficient planning and family office setup for $8M liquidity event.",
+    "ms": 5587
+  },
+  "inb-002": {
+    "category": "existing_client",
+    "priority": "high",
+    "confidence": 0.97,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Existing client Dana Whitfield requests an updated portfolio statement by Friday for her mortgage lender",
+    "ms": 4049
+  },
+  "inb-003": {
+    "category": "vendor",
+    "priority": "low",
+    "confidence": 0.97,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Vendor from Lumen Analytics requests a 20\u2011minute demo of their portfolio analytics platform.",
+    "ms": 2470
+  },
+  "inb-004": {
+    "category": "recruiter",
+    "priority": "low",
+    "confidence": 0.98,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Recruiter from TalentBridge reaching out about a senior role and requesting a chat this week",
+    "ms": 4043
+  },
+  "inb-005": {
+    "category": "existing_client",
+    "priority": "high",
+    "confidence": 0.97,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Client Robert Ellison is upset about an unexpected fee on his statement and requests a call back today.",
+    "ms": 2960
+  },
+  "inb-006": {
+    "category": "prospect",
+    "priority": "low",
+    "confidence": 0.95,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Alicia Tran is exploring advisory services, asking about minimum engagement and fee structure with no urgency.",
+    "ms": 3353
+  },
+  "inb-007": {
+    "category": "partner_referral",
+    "priority": "medium",
+    "confidence": 0.96,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Jordan Massey from Cedar Ridge Wealth proposes a referral partnership to handle client needs outside their scope",
+    "ms": 5598
+  },
+  "inb-008": {
+    "category": "noise",
+    "priority": "low",
+    "confidence": 0.99,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Automated Monday market digest newsletter from Market Daily",
+    "ms": 3017
+  },
+  "inb-009": {
+    "category": "unclear",
+    "priority": "low",
+    "confidence": 0.4,
+    "source": "llm",
+    "needs_review": true,
+    "summary": "Sam Cho is following up on a prior conversation, asking for next steps.",
+    "ms": 3965
+  },
+  "inb-010": {
+    "category": "unclear",
+    "priority": "low",
+    "confidence": 0.3,
+    "source": "llm",
+    "needs_review": true,
+    "summary": "Empty message with only a period; no actionable content.",
+    "ms": 3281
+  },
+  "inb-011": {
+    "category": "unclear",
+    "priority": "low",
+    "confidence": 0.3,
+    "source": "llm",
+    "needs_review": true,
+    "summary": "Forwarded email with truncated content and no clear request",
+    "ms": 3510
+  },
+  "inb-012": {
+    "category": "existing_client",
+    "priority": "medium",
+    "confidence": 0.96,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Helen Ortiz, an existing client, wants to schedule her quarterly review in the next few weeks, preferably mornings.",
+    "ms": 5955
+  },
+  "inb-013": {
+    "category": "prospect",
+    "priority": "medium",
+    "confidence": 0.93,
+    "source": "llm",
+    "needs_review": false,
+    "summary": "Nathan Brooks, referred by client Dana Whitfield, seeks comprehensive family planning and wants an introductory call soon.",
+    "ms": 6127
+  }
+}

@@ -196,6 +196,32 @@ plausible-looking queue, seen sensible labels, and shipped a priority rule that
 silently under-escalates client deadlines. That is worth more than the accuracy
 number.
 
+**A second model, independently, agrees with the first and not with me.** After
+building the n8n backend I ran the same 13 messages through `gpt-oss:120b` (a
+different lab, a different transport, prompt-based JSON rather than constrained
+decoding). Category accuracy was again 13/13. Priority was 10/13 — one *better*
+than `claude-opus-5` — and the disagreements land in overlapping places, all in the
+same direction:
+
+| id | my label | claude-opus-5 | gpt-oss:120b |
+|---|---|---|---|
+| inb-001 | high | medium | low |
+| inb-002 | high | medium | high ✓ |
+| inb-009 | medium (contested) | low | low |
+| inb-013 | high | medium | medium |
+
+One model declining to escalate is a model problem. Two models from different labs
+declining to escalate the same messages, while agreeing with each other, is a
+specification problem — mine. That is the strongest evidence in this submission for
+the conclusion above, and I would not have had it without building the second
+backend.
+
+It also says something about where the accuracy comes from: both models get all
+thirteen categories right, so on this corpus the taxonomy and the prompt are doing
+that work, not model capability. The judgement call the models actually differ on is
+priority — which is precisely the part of my spec that turned out to be
+under-written.
+
 **How I would fix it** (not applied — I would rather show the honest measurement
 than tune the prompt until it matches my labels, which is how you overfit a
 13-row eval):
