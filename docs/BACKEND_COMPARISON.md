@@ -97,22 +97,32 @@ call, not a technical one.
 
 ## Running the n8n version
 
-The workflow is created but **not activated**, and it holds no credentials by
-design. To run it:
+The workflow ships as import-ready JSON in
+[`n8n/triage-backend-workflow.json`](../n8n/triage-backend-workflow.json) (12 nodes,
+no credentials embedded). `n8n/triage-backend-workflow.js` is the SDK source it is
+generated from; the JSON is what you import.
 
-1. Open https://kitschllc.app.n8n.cloud/workflow/cAcpNB0z5FkmIFnP
-   (personal project — deliberately not a shared team project).
-2. Create two credentials with **your own** keys, not shared company ones:
-   - `OpenRouter (personal)` — HTTP Bearer Auth, your OpenRouter key.
-   - `Arootah Triage Supabase (personal)` — Supabase API, project
-     `pdwotzqfdnnmdspzlqjr`, service-role key.
-3. Attach them to `Triage via OpenRouter`, `Repair Attempt` and
-   `Store Triage Result`. Credential auto-assignment was skipped on the HTTP nodes
-   on purpose.
-4. Activate, then:
+**1. Import**
+
+In n8n: *Workflows -> Import from File* -> select
+`n8n/triage-backend-workflow.json`.
+
+**2. Attach credentials.** They are intentionally empty, so nothing is wired to a
+shared or inherited credential by accident. Create two and attach them:
+
+| Credential | Type | Attach to |
+|---|---|---|
+| OpenRouter | HTTP Bearer Auth | `Triage via OpenRouter`, `Repair Attempt` |
+| Supabase | Supabase API | `Store Triage Result` |
+
+The Supabase credential needs host `https://pdwotzqfdnnmdspzlqjr.supabase.co` and
+the service-role key. The `arootah_triage` schema is already exposed to the REST API,
+which is what makes `useCustomSchema` work.
+
+**3. Activate, then call it**
 
 ```bash
-curl -X POST https://kitschllc.app.n8n.cloud/webhook/arootah-triage \
+curl -X POST https://n8n.srv1333076.hstgr.cloud/webhook/arootah-triage \
   -H 'Content-Type: application/json' \
   -d '{
     "id": "inb-005",
@@ -125,10 +135,28 @@ curl -X POST https://kitschllc.app.n8n.cloud/webhook/arootah-triage \
 ```
 
 Expect `existing_client` / `high`, with `backend: "n8n"` in the response so it is
-unambiguous which implementation answered.
+unambiguous which implementation answered. Two more worth trying:
 
-> **Note on where this lives.** This n8n instance belongs to Kitsch. The workflow is
-> in a personal project and wired to no company credential, but a take-home artifact
-> for another firm sitting in an employer's tooling is a judgement call worth making
-> deliberately. Self-hosting n8n or a personal cloud account would be cleaner; the
-> exported JSON in this repo runs anywhere.
+```bash
+# corrupted transport -> unclear, low confidence, flagged for review
+-d '{"from_name":"=?utf-8?B?","from_org":"(unknown)","subject":"FWD: RE:",
+     "body":"--- forwarded message truncated --- Content-Type: multipart/alternative; boundary=00042"}'
+
+# unattributable follow-up -> unclear rather than a confident guess
+-d '{"from_name":"Chris","from_org":"(unknown)","subject":"circling back",
+     "body":"Hey, any update on that thing we discussed? Thanks"}'
+```
+
+Before activating, note that an active n8n webhook is **unauthenticated and
+publicly reachable**, and this one spends money on every call. The Cloudflare
+deployment guards its equivalent endpoint with a per-IP limit, a daily cap and an
+input-length cap. This workflow has none of those: n8n's webhook node offers header
+or basic auth, and for anything beyond a demo you would want that plus a cap. It is
+the same lesson as the Next.js side — an unauthenticated endpoint over a paid API is
+an API-key proxy — and it is easier to forget here, because the workflow does not
+make you write the endpoint.
+
+**Self-hosted, deliberately.** This runs on `n8n.srv1333076.hstgr.cloud`, a personal
+instance, rather than an employer's tooling. A take-home artifact for another firm
+does not belong in a company's n8n, and neither do that company's API credits. An
+earlier version of this workflow lived in a Kitsch instance and has been archived.

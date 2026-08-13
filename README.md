@@ -160,8 +160,9 @@ themselves.
 ## Two backends
 
 The primary implementation is Next.js. The same pipeline also exists as an n8n
-workflow (`n8n/triage-backend-workflow.js`, 12 nodes), built to answer "code or
-workflow?" with evidence rather than opinion.
+workflow — 12 nodes, import-ready at
+[`n8n/triage-backend-workflow.json`](./n8n/triage-backend-workflow.json) — built to
+answer "code or workflow?" with evidence rather than opinion.
 
 Short version: **code for the pipeline, n8n for the edges.** The triage step has a
 schema contract and an eval harness, so it belongs in typed code where the contract
