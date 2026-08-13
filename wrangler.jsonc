@@ -5,6 +5,11 @@
   //
   // TRIAGE_QUOTA (KV)      -> global daily counter for the public try-it form.
   // TRIAGE_RATE_LIMIT      -> per-IP burst limit, 5 requests per 60s.
+  //
+  // N8N_WEBHOOK_URL is a var rather than a secret: it is a public unauthenticated
+  // endpoint whose URL is already published in docs/BACKEND_COMPARISON.md and the
+  // n8n workflow exports, so hiding it here would be theatre. The real hardening
+  // is header auth on the n8n webhook itself - see README.
 
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "inbound-triage-assistant",
@@ -20,6 +25,9 @@
   },
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "N8N_WEBHOOK_URL": "https://n8n.srv1333076.hstgr.cloud/webhook/arootah-triage"
   },
   "kv_namespaces": [
     {

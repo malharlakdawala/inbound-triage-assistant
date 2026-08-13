@@ -451,3 +451,109 @@ footer {
 .try-quota {
   font-variant-numeric: tabular-nums;
 }
+
+/* --- two-backend comparison --------------------------------------------- */
+/* Side-by-side rather than tabbed: the comparison is the point, and a tab hides
+   half of it. Collapses to one column under 720px, where stacking is the only
+   honest option. */
+
+.cmp-verdict {
+  margin-top: 1rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+}
+
+.cmp-verdict.same {
+  border-color: var(--low);
+  background: var(--low-bg);
+  color: var(--low);
+}
+
+.cmp-verdict.diff {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.cmp-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+@media (max-width: 720px) {
+  .cmp-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cmp-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0.875rem;
+  min-width: 0;
+}
+
+.cmp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.cmp-num {
+  flex: none;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  white-space: nowrap;
+}
+
+.cmp-head strong {
+  display: block;
+  font-size: 0.875rem;
+}
+
+.cmp-sub {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.cmp-wait {
+  margin-top: 1rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.cmp-err {
+  margin-top: 1rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--high);
+  background: var(--high-bg);
+  color: var(--high);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+}
+
+.cmp-errnote {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.cmp-panel .try-result {
+  margin-top: 0.875rem;
+}

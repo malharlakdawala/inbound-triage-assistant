@@ -8,7 +8,19 @@ Built for the Arootah AI Product Engineer take-home. All data is synthetic.
 
 **Live:** https://inbound-triage-assistant.malharlakdawala.workers.dev
 Shows the stored triage of all 13 messages, plus a **Try it live** form that runs
-a real `claude-opus-5` call on a message you paste. Capped — see Deploying.
+your message through **both backends at once** and puts the two answers side by
+side:
+
+| | Backend 1 | Backend 2 |
+|---|---|---|
+| Runtime | Next.js route handler, in-process TypeScript | Self-hosted n8n workflow, 14 nodes |
+| Model | `claude-opus-5` via OpenRouter | `gpt-oss:120b` via Ollama Cloud |
+| Endpoint | `POST /api/try` | `POST /api/try-n8n` → webhook |
+
+Same prompt, same schema, same repair-retry contract — two independent
+implementations. The form reports whether they agree, which turns the
+code-vs-workflow question into something a reviewer can test rather than take on
+trust. Both are capped; see Deploying.
 
 **The reasoning behind every choice is in [RATIONALE.md](./RATIONALE.md)** — that
 is the document worth reading; this one is how to run it.
@@ -107,17 +119,18 @@ the eval harness worth having.
 publishable key and is read-only under RLS. The service-role key bypasses RLS and
 never leaves a local machine.
 
-**One endpoint on the deployment can spend money, and it is capped three ways.**
+**Two endpoints on the deployment can spend money, and both are capped three ways.**
 The queue itself is read-only — it serves results produced locally, and
 `/api/triage` (which writes) stays gated behind an admin token that production
-does not have. The exception is `/api/try`, the public form, because letting a
-reviewer actually use the tool is worth more than describing it. An
-unauthenticated endpoint calling a paid model is an API-key proxy, so:
+does not have. The exceptions are `/api/try` and `/api/try-n8n`, the public form's
+two backends, because letting a reviewer actually use the tool is worth more than
+describing it. An unauthenticated endpoint calling a paid model is an API-key
+proxy, so:
 
-- **Per-IP limit** — 5/minute, enforced in KV (verified: the 6th request in a
-  minute returns 429).
-- **Global daily cap** — 150 live triages, ~$1.85/day worst case, resetting at
-  00:00 UTC.
+- **Per-IP limit** — 5/minute per backend, enforced in KV (verified: the 6th
+  request in a minute returns 429).
+- **Global daily cap** — 150 live triages per backend, ~$1.85/day worst case on
+  backend 1, resetting at 00:00 UTC.
 - **Input cap** — 2,000 characters, because cost scales with input tokens.
 - **No writes** — ad-hoc triage is returned and discarded, so the stored queue
   cannot be polluted and no write credential exists on the Worker.
@@ -128,6 +141,19 @@ eventually consistent, so read-then-write can undercount under a concurrent
 burst — measured at 8 rapid calls registering as 5. It is a demo spend ceiling,
 not a billing control; a Durable Object is the correct fix if it ever metered
 anything that mattered.
+
+Both backends share **one** guard implementation ([`lib/try-guards.ts`](./lib/try-guards.ts))
+with separate counters. Copying the limiter into the second route would have meant
+two spend limits drifting apart, and the failure mode of a spend limit that stops
+matching its twin is a bill rather than a bug report. The counters are separate
+because the two backends bill to different accounts, so a shared budget would let
+the cheap one exhaust the expensive one's allowance.
+
+**Known gap:** the n8n webhook behind backend 2 is currently unauthenticated. The
+proxy in front of it carries the spend guards, but the webhook itself can still be
+called directly by anyone who reads the URL out of this repo. Header auth on the
+webhook node is the fix and is not yet done — recorded here rather than omitted,
+since an undocumented open endpoint is worse than a documented one.
 
 **What I deliberately did not build:** auth, Docker, CI, a test-coverage target,
 telemetry, multi-user, streaming, a job queue. The brief puts these out of scope
@@ -159,10 +185,24 @@ themselves.
 
 ## Two backends
 
+Both are live, and the **Try it live** form runs your message through both at once
+so the comparison is observable rather than asserted. They fire independently: if
+n8n is unreachable, that column shows the failure and backend 1 still answers.
+Sequential calls would double the wait, and one combined request would let either
+failure erase both results — the independence is the whole point of running two.
+
 The primary implementation is Next.js. The same pipeline also exists as an n8n
-workflow — 12 nodes, import-ready at
-[`n8n/triage-backend-workflow.json`](./n8n/triage-backend-workflow.json) — built to
-answer "code or workflow?" with evidence rather than opinion.
+workflow — import-ready at
+[`n8n/triage-backend-ollama.json`](./n8n/triage-backend-ollama.json) (14 nodes,
+Ollama) and [`n8n/triage-backend-workflow.json`](./n8n/triage-backend-workflow.json)
+(12 nodes, hosted Claude) — built to answer "code or workflow?" with evidence
+rather than opinion.
+
+Running both against the same input is also what produced the strongest finding in
+[RATIONALE.md](./RATIONALE.md): the two models disagree with my priority labels in
+the *same direction* on the same messages, which makes the gap a specification bug
+rather than a model bug. One model disagreeing is a model problem; two models
+agreeing with each other and not with you is a problem with your rule.
 
 There are two n8n variants: one calling the same hosted `claude-opus-5`, and one
 calling **Ollama** with an n8n Data table instead of Supabase. The Ollama route
@@ -272,5 +312,13 @@ Verified against the live deployment: `POST /api/triage` returns
 
 for both a missing token and a guessed one, and grepping the served HTML and every
 JS chunk for `sk-ant-api`, `sk-or-v1`, `service_role` and `TRIAGE_ADMIN` returns
-zero hits. The deployment is structurally incapable of calling a paid API or
-writing to the database: it holds no credential that would let it.
+zero hits.
+
+To be precise about what that does and does not prove: the deployment holds **no
+write credential**, so it cannot modify the database — `SUPABASE_SERVICE_ROLE_KEY`
+and `TRIAGE_ADMIN_TOKEN` exist only on a local machine. It *can* call a paid API,
+deliberately: `OPENROUTER_API_KEY` is a runtime secret set via `wrangler secret put`
+so the public form works, which is why the spend caps above are load-bearing rather
+than decorative. An earlier version of this README claimed the deployment held no
+credential that would let it call a paid API. That was wrong, and the caps are the
+reason it is safe anyway.
